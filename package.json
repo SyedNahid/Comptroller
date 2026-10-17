@@ -19,6 +19,7 @@
     "@modelcontextprotocol/sdk": "^1.32.1",
     "dotenv": "^18.0.8",
     "next": "16.4.2",
+    "openai": "^7.36.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "zod": "^3.25.76"
