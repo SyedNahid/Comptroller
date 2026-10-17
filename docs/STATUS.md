@@ -40,7 +40,10 @@ an Airwallex account-config step (not a code issue).
 - ✅ **NL → policy compiler** — operator describes a budget in plain English; an LLM
   compiles it to a deterministic AgentPolicy, which is applied + operator re-signs the
   mandate. Verified: new caps enforce, mandate stays valid. `src/lib/agent/policy-compiler.ts`.
-- ✅ Pushed to GitHub: https://github.com/SyedNahid/Comptroller
+- ✅ **Remote-auth webhook** (`/api/airwallex/remote-auth`) — HMAC-verified real-time
+  approve/decline enforcing card scope; dormant until issuing enabled, correct contract.
+- ✅ **Reconciliation CSV export** (`/api/export/reconciliation`) + dashboard button.
+- ✅ Pushed to GitHub: https://github.com/SyedNahid/Comptroller (latest commits local-only)
 - ✅ Typecheck clean. Next 16 `cacheComponents` disabled (see FIXES).
 - ✅ Docs: CONTEXT / ARCHITECTURE / STATUS / FIXES / SUPPORT_REQUEST.
 
