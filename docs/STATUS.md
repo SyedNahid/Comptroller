@@ -27,8 +27,17 @@ an Airwallex account-config step (not a code issue).
 - ✅ **Mission-control dashboard** + API routes (state / fund-request / approve /
   spend / demo / reset). Verified live at http://localhost:3000 — ▶ Run demo,
   ✋ Approve, savings counter, audit timeline all working.
+- ✅ **MCP server** (`src/mcp/server.ts`) — treasury as MCP tools (list_agents,
+  get_balances, request_funds, get_activity). `npm run mcp:smoke` passes.
+- ✅ **External Claude agent** (`scripts/agent.ts`) — connects over MCP, reasons, and
+  spends through the governed wallet. `npm run agent` (scripted fallback without
+  ANTHROPIC_API_KEY; real Claude tool-loop when a key is present).
+- ✅ Pushed to GitHub: https://github.com/SyedNahid/Comptroller
 - ✅ Typecheck clean. Next 16 `cacheComponents` disabled (see FIXES).
 - ✅ Docs: CONTEXT / ARCHITECTURE / STATUS / FIXES / SUPPORT_REQUEST.
+
+## All buildable pieces are DONE
+Everything not gated on Airwallex issuing enablement is built + verified.
 
 ## Blocked / waiting
 - 🚫 **Card issuance** (task #3) — account's **issuing program not configured**:
