@@ -37,6 +37,9 @@ an Airwallex account-config step (not a code issue).
 - ✅ **Signed mandates (Ed25519)** — operator-signed, tamper-evident agent authority
   verified before any spend (AP2 / Visa Trusted-Agent aligned). Tamper → DENY;
   re-sign → restored. Verified live. `src/lib/mandate/signing.ts`.
+- ✅ **NL → policy compiler** — operator describes a budget in plain English; an LLM
+  compiles it to a deterministic AgentPolicy, which is applied + operator re-signs the
+  mandate. Verified: new caps enforce, mandate stays valid. `src/lib/agent/policy-compiler.ts`.
 - ✅ Pushed to GitHub: https://github.com/SyedNahid/Comptroller
 - ✅ Typecheck clean. Next 16 `cacheComponents` disabled (see FIXES).
 - ✅ Docs: CONTEXT / ARCHITECTURE / STATUS / FIXES / SUPPORT_REQUEST.

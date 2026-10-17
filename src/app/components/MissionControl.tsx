@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { formatMoney } from "@/lib/money";
 import { DECISION_STYLE, AUDIT_STYLE, type State } from "./types";
 
@@ -15,6 +16,8 @@ export function MissionControl({
   post: (url: string, body?: unknown) => Promise<void>;
 }) {
   const pending = state?.requests.filter((r) => r.status === "PENDING_APPROVAL") ?? [];
+  const [editing, setEditing] = useState<string | null>(null);
+  const [text, setText] = useState("");
 
   return (
     <>
@@ -60,18 +63,55 @@ export function MissionControl({
                     >
                       {m?.verified ? "🔐 mandate verified (Ed25519)" : `⚠ mandate invalid — ${m?.reason ?? "?"}`}
                     </span>
-                    <button
-                      disabled={busy}
-                      onClick={() =>
-                        run(() =>
-                          post(m?.verified ? "/api/mandate/tamper" : "/api/mandate/reseal", { agentId: a.agentId }),
-                        )
-                      }
-                      className="ml-auto text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50"
-                    >
-                      {m?.verified ? "Tamper" : "Re-sign"}
-                    </button>
+                    <div className="ml-auto flex gap-1">
+                      <button
+                        disabled={busy}
+                        onClick={() => {
+                          setEditing(editing === a.agentId ? null : a.agentId);
+                          setText("");
+                        }}
+                        className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50"
+                      >
+                        ✎ policy
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          run(() =>
+                            post(m?.verified ? "/api/mandate/tamper" : "/api/mandate/reseal", { agentId: a.agentId }),
+                          )
+                        }
+                        className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50"
+                      >
+                        {m?.verified ? "Tamper" : "Re-sign"}
+                      </button>
+                    </div>
                   </div>
+
+                  {editing === a.agentId && (
+                    <div className="mt-2 space-y-2">
+                      <textarea
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        placeholder={`e.g. "Let the ${a.agentId} spend up to $750/day on ads and cloud, auto-approve under $200"`}
+                        rows={2}
+                        className="w-full rounded bg-zinc-900 border border-zinc-800 p-2 text-[11px]"
+                      />
+                      <button
+                        disabled={busy || !text.trim()}
+                        onClick={() =>
+                          run(async () => {
+                            await post("/api/policy/compile", { agentId: a.agentId, text });
+                            setEditing(null);
+                            setText("");
+                          })
+                        }
+                        className="text-[10px] px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50"
+                      >
+                        {busy ? "Compiling…" : "Compile & re-sign (LLM)"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}

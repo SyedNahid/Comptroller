@@ -10,6 +10,7 @@ import { Comptroller } from "./service";
 import { StubCardIssuer, AirwallexCardIssuer, type CardIssuer } from "./issuer";
 import { airwallexFromEnv } from "../airwallex/client";
 import { SEED_AGENTS } from "../agents/seed";
+import type { AgentPolicy } from "../mandate/types";
 import {
   generateOperatorKeypair,
   signMandate,
@@ -29,35 +30,42 @@ interface Singletons {
 const g = globalThis as unknown as { __comptroller?: Singletons };
 const KEY_PATH = ".data/operator.json";
 
-/** Build a freshly-signed mandate for a seed agent. */
-function sealMandate(agentId: string, privateKeyPem: string) {
-  const a = SEED_AGENTS.find((s) => s.agentId === agentId);
-  if (!a) return;
+/** Build a freshly-signed mandate from an agent policy (current source of truth). */
+function sealPolicy(policy: AgentPolicy, privateKeyPem: string) {
   const now = new Date();
   const expires = new Date(now.getTime() + 365 * 24 * 3600 * 1000);
   const doc: MandateDoc = {
-    agentId: a.agentId,
+    agentId: policy.agentId,
     constraints: {
-      perTaskCapMinor: a.perTaskCapMinor,
-      dailyCapMinor: a.dailyCapMinor,
-      autoApproveThresholdMinor: a.autoApproveThresholdMinor,
-      allowedCurrencies: a.allowedCurrencies,
-      allowedMerchantCategories: a.allowedMerchantCategories,
+      perTaskCapMinor: policy.perTaskCapMinor,
+      dailyCapMinor: policy.dailyCapMinor,
+      autoApproveThresholdMinor: policy.autoApproveThresholdMinor,
+      allowedCurrencies: policy.allowedCurrencies,
+      allowedMerchantCategories: policy.allowedMerchantCategories,
     },
     issuedAt: now.toISOString(),
     expiresAt: expires.toISOString(),
     nonce: randomUUID(),
   };
-  return { doc, signed: signMandate(doc, privateKeyPem), at: now.toISOString() };
+  return { signed: signMandate(doc, privateKeyPem), at: now.toISOString() };
 }
 
-/** Re-sign every seed agent's mandate (restores integrity after a tamper demo). */
+/** Re-sign every agent's mandate from its CURRENT policy (restores integrity). */
 export function resealMandates() {
   const { ledger, operator } = getComptroller();
-  for (const a of SEED_AGENTS) {
-    const m = sealMandate(a.agentId, operator.privateKeyPem);
-    if (m) ledger.upsertMandate(a.agentId, m.signed, m.at);
+  for (const p of ledger.getAgents()) {
+    const m = sealPolicy(p, operator.privateKeyPem);
+    ledger.upsertMandate(p.agentId, m.signed, m.at);
   }
+}
+
+/** Re-sign a single agent's mandate (used after a policy update). */
+export function sealAgentMandate(agentId: string) {
+  const { ledger, operator } = getComptroller();
+  const p = ledger.getPolicy(agentId);
+  if (!p) return;
+  const m = sealPolicy(p, operator.privateKeyPem);
+  ledger.upsertMandate(agentId, m.signed, m.at);
 }
 
 function loadOrCreateOperatorKeys(): OperatorKeypair {
@@ -84,8 +92,8 @@ export function getComptroller(): Singletons {
   const operator = loadOrCreateOperatorKeys();
   if (ledger.countMandates() === 0) {
     for (const a of SEED_AGENTS) {
-      const m = sealMandate(a.agentId, operator.privateKeyPem);
-      if (m) ledger.upsertMandate(a.agentId, m.signed, m.at);
+      const m = sealPolicy(a, operator.privateKeyPem);
+      ledger.upsertMandate(a.agentId, m.signed, m.at);
     }
   }
 

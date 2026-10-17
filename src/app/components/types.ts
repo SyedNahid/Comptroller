@@ -62,4 +62,5 @@ export const AUDIT_STYLE: Record<string, string> = {
   MANDATE_INVALID: "text-rose-400",
   MANDATE_TAMPERED: "text-rose-400",
   MANDATE_RESEALED: "text-emerald-400",
+  POLICY_UPDATED: "text-indigo-400",
 };
