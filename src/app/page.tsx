@@ -2,63 +2,20 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { formatMoney } from "@/lib/money";
+import type { State } from "./components/types";
+import { ProblemView } from "./components/ProblemView";
+import { AgentConsole } from "./components/AgentConsole";
+import { MissionControl } from "./components/MissionControl";
+import { AirwallexProof } from "./components/AirwallexProof";
 
-interface AgentPolicy {
-  agentId: string;
-  displayName: string;
-  baseCurrency: string;
-  allowedCurrencies: string[];
-  allowedMerchantCategories: string[];
-  perTaskCapMinor: number;
-  dailyCapMinor: number;
-  autoApproveThresholdMinor: number;
-}
-interface FundRequestRow {
-  id: string;
-  agent_id: string;
-  task: string;
-  amount_minor: number;
-  currency: string;
-  merchant_name: string | null;
-  decision: string;
-  status: string;
-  reason: string;
-}
-interface AuditRow {
-  id: number;
-  ts: string;
-  type: string;
-  message: string;
-}
-interface Balance {
-  currency: string;
-  available_amount: number;
-}
-interface State {
-  issuingKind: string;
-  agents: AgentPolicy[];
-  requests: FundRequestRow[];
-  audit: AuditRow[];
-  totalSavedMinor: number;
-  balances: Balance[];
-}
+type View = "problem" | "agent" | "control" | "proof";
 
-const DECISION_STYLE: Record<string, string> = {
-  AUTO_APPROVE: "text-emerald-400",
-  NEEDS_HUMAN: "text-amber-400",
-  DENY: "text-rose-400",
-};
-const AUDIT_STYLE: Record<string, string> = {
-  MANDATE_AUTO_APPROVE: "text-emerald-400",
-  MANDATE_NEEDS_HUMAN: "text-amber-400",
-  MANDATE_DENY: "text-rose-400",
-  FX_CONVERTED: "text-sky-400",
-  CARD_ISSUED: "text-violet-400",
-  HUMAN_APPROVED: "text-amber-300",
-  AUTH_AUTHORIZED: "text-emerald-400",
-  AUTH_DECLINED: "text-rose-400",
-  CLAWBACK: "text-teal-400",
-};
+const NAV: { key: View; label: string }[] = [
+  { key: "problem", label: "1 · The Problem" },
+  { key: "agent", label: "2 · Agent Console" },
+  { key: "control", label: "3 · Mission Control" },
+  { key: "proof", label: "4 · Airwallex Proof" },
+];
 
 async function post(url: string, body?: unknown) {
   await fetch(url, {
@@ -68,13 +25,18 @@ async function post(url: string, body?: unknown) {
   });
 }
 
-export default function Dashboard() {
+export default function App() {
+  const [view, setView] = useState<View>("problem");
   const [state, setState] = useState<State | null>(null);
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/state", { cache: "no-store" });
-    setState(await res.json());
+    try {
+      const res = await fetch("/api/state", { cache: "no-store" });
+      setState(await res.json());
+    } catch {
+      /* ignore transient */
+    }
   }, []);
 
   useEffect(() => {
@@ -93,42 +55,53 @@ export default function Dashboard() {
     }
   };
 
-  const pending = state?.requests.filter((r) => r.status === "PENDING_APPROVAL") ?? [];
-
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-mono">
-      {/* Header */}
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between sticky top-0 bg-zinc-950/90 backdrop-blur z-10">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">
-            COMPTROLLER<span className="text-zinc-500"> · treasury for AI agents</span>
-          </h1>
-          <p className="text-[11px] text-zinc-500">
-            issuing:{" "}
-            <span className={state?.issuingKind === "live" ? "text-emerald-400" : "text-amber-400"}>
-              {state?.issuingKind ?? "…"}
-            </span>
-          </p>
-        </div>
+      <header className="border-b border-zinc-800 px-6 py-3 flex items-center justify-between sticky top-0 bg-zinc-950/90 backdrop-blur z-10">
         <div className="flex items-center gap-6">
+          <h1 className="text-lg font-bold tracking-tight">
+            COMPTROLLER<span className="text-zinc-600"> · treasury for AI agents</span>
+          </h1>
+          <nav className="hidden md:flex gap-1">
+            {NAV.map((n) => (
+              <button
+                key={n.key}
+                onClick={() => setView(n.key)}
+                className={`px-3 py-1.5 rounded text-xs ${
+                  view === n.key ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                {n.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+        <div className="flex items-center gap-5">
           <div className="text-right">
-            <div className="text-[11px] text-zinc-500 uppercase">Est. FX saved</div>
-            <div className="text-2xl font-bold text-emerald-400 tabular-nums">
+            <div className="text-[10px] text-zinc-500 uppercase">Est. FX saved</div>
+            <div className="text-lg font-bold text-emerald-400 tabular-nums">
               {state ? formatMoney(state.totalSavedMinor, "USD") : "—"}
             </div>
           </div>
+          <span
+            className={`text-[10px] px-2 py-1 rounded ${
+              state?.issuingKind === "live" ? "bg-emerald-900 text-emerald-300" : "bg-amber-900/50 text-amber-300"
+            }`}
+          >
+            issuing: {state?.issuingKind ?? "…"}
+          </span>
           <div className="flex gap-2">
             <button
               disabled={busy}
               onClick={() => run(() => post("/api/demo"))}
-              className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold disabled:opacity-50"
+              className="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold disabled:opacity-50"
             >
               ▶ Run demo
             </button>
             <button
               disabled={busy}
               onClick={() => run(() => post("/api/reset"))}
-              className="px-3 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-sm disabled:opacity-50"
+              className="px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-xs disabled:opacity-50"
             >
               Reset
             </button>
@@ -136,108 +109,25 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Treasury balances */}
-      <section className="px-6 py-3 border-b border-zinc-900 flex gap-3 flex-wrap">
-        <span className="text-[11px] text-zinc-500 uppercase self-center">Treasury</span>
-        {(state?.balances ?? []).map((b) => (
-          <span key={b.currency} className="px-2 py-1 rounded bg-zinc-900 text-xs tabular-nums">
-            {b.currency} {b.available_amount.toLocaleString()}
-          </span>
+      {/* mobile nav */}
+      <nav className="md:hidden flex gap-1 px-4 py-2 border-b border-zinc-900 overflow-x-auto">
+        {NAV.map((n) => (
+          <button
+            key={n.key}
+            onClick={() => setView(n.key)}
+            className={`px-3 py-1.5 rounded text-xs whitespace-nowrap ${
+              view === n.key ? "bg-zinc-800" : "text-zinc-500"
+            }`}
+          >
+            {n.label}
+          </button>
         ))}
-      </section>
+      </nav>
 
-      <main className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
-        {/* Fleet + approvals */}
-        <section>
-          <h2 className="text-xs uppercase text-zinc-500 mb-3">Agent fleet</h2>
-          <div className="space-y-3">
-            {(state?.agents ?? []).map((a) => (
-              <div key={a.agentId} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold">{a.displayName}</span>
-                  <span className="text-xs px-2 py-0.5 rounded bg-zinc-800">{a.baseCurrency}</span>
-                </div>
-                <div className="text-[11px] text-zinc-500 mt-1">
-                  per-task {formatMoney(a.perTaskCapMinor, a.baseCurrency)} · daily{" "}
-                  {formatMoney(a.dailyCapMinor, a.baseCurrency)} · auto ≤{" "}
-                  {formatMoney(a.autoApproveThresholdMinor, a.baseCurrency)}
-                </div>
-                <div className="text-[11px] text-zinc-600 mt-1">
-                  MCC {a.allowedMerchantCategories.join(", ") || "any"}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <h2 className="text-xs uppercase text-zinc-500 mt-6 mb-3">
-            Pending approvals{" "}
-            {pending.length > 0 && <span className="text-amber-400">({pending.length})</span>}
-          </h2>
-          <div className="space-y-2">
-            {pending.length === 0 && <p className="text-xs text-zinc-600">None.</p>}
-            {pending.map((r) => (
-              <div key={r.id} className="rounded-lg border border-amber-700/50 bg-amber-950/20 p-3">
-                <div className="text-sm">
-                  {r.agent_id} · {r.task}
-                </div>
-                <div className="text-xs text-zinc-400">
-                  {formatMoney(r.amount_minor, r.currency)} → {r.merchant_name}
-                </div>
-                <button
-                  disabled={busy}
-                  onClick={() => run(() => post("/api/approve", { id: r.id }))}
-                  className="mt-2 px-3 py-1 rounded bg-amber-600 hover:bg-amber-500 text-xs font-semibold disabled:opacity-50"
-                >
-                  ✋ Approve
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Requests */}
-        <section>
-          <h2 className="text-xs uppercase text-zinc-500 mb-3">Fund requests</h2>
-          <div className="space-y-2">
-            {(state?.requests ?? []).map((r) => (
-              <div key={r.id} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
-                <div className="flex justify-between">
-                  <span className="text-sm">
-                    {r.agent_id} · {r.task}
-                  </span>
-                  <span className={`text-xs font-semibold ${DECISION_STYLE[r.decision] ?? ""}`}>
-                    {r.decision}
-                  </span>
-                </div>
-                <div className="text-xs text-zinc-400">
-                  {formatMoney(r.amount_minor, r.currency)}
-                  {r.merchant_name ? ` → ${r.merchant_name}` : ""} ·{" "}
-                  <span className="text-zinc-500">{r.status}</span>
-                </div>
-              </div>
-            ))}
-            {(state?.requests.length ?? 0) === 0 && (
-              <p className="text-xs text-zinc-600">No requests yet — hit “Run demo”.</p>
-            )}
-          </div>
-        </section>
-
-        {/* Audit timeline */}
-        <section>
-          <h2 className="text-xs uppercase text-zinc-500 mb-3">Audit timeline</h2>
-          <div className="space-y-1.5">
-            {(state?.audit ?? []).map((a) => (
-              <div key={a.id} className="text-[11px] leading-relaxed">
-                <span className={`font-semibold ${AUDIT_STYLE[a.type] ?? "text-zinc-400"}`}>
-                  {a.type}
-                </span>{" "}
-                <span className="text-zinc-400">{a.message}</span>
-              </div>
-            ))}
-            {(state?.audit.length ?? 0) === 0 && <p className="text-xs text-zinc-600">Quiet.</p>}
-          </div>
-        </section>
-      </main>
+      {view === "problem" && <ProblemView onStart={() => setView("agent")} />}
+      {view === "agent" && <AgentConsole onActivity={refresh} />}
+      {view === "control" && <MissionControl state={state} busy={busy} run={run} post={post} />}
+      {view === "proof" && <AirwallexProof state={state} />}
     </div>
   );
 }
