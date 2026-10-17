@@ -50,7 +50,7 @@ async function connectMcp() {
 /** OpenAI-compatible loop (Groq / Gemini / OpenRouter / Ollama / OpenAI). */
 async function runOpenAICompatible(goal: string, client: Client) {
   const baseURL = process.env.LLM_BASE_URL ?? "https://api.groq.com/openai/v1";
-  const model = process.env.LLM_MODEL ?? "llama-3.3-70b-versatile";
+  const model = process.env.LLM_MODEL ?? "openai/gpt-oss-120b";
   const openai = new OpenAI({ apiKey: process.env.LLM_API_KEY, baseURL });
   console.log(`(LLM: ${model} @ ${baseURL})\n`);
 
