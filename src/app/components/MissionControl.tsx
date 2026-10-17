@@ -28,11 +28,19 @@ export function MissionControl({
             {b.currency} {b.available_amount.toLocaleString()}
           </span>
         ))}
-        {state?.operatorFingerprint && (
-          <span className="ml-auto text-[11px] text-zinc-500">
-            🔑 operator key <span className="text-zinc-400">{state.operatorFingerprint}</span>
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-3">
+          {state?.operatorFingerprint && (
+            <span className="text-[11px] text-zinc-500">
+              🔑 operator key <span className="text-zinc-400">{state.operatorFingerprint}</span>
+            </span>
+          )}
+          <a
+            href="/api/export/reconciliation"
+            className="text-[11px] px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
+          >
+            ⬇ Export CSV
+          </a>
+        </div>
       </section>
 
       <main className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">

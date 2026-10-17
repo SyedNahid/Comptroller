@@ -288,6 +288,12 @@ export class Ledger {
       .all(limit) as unknown as Record<string, unknown>[];
   }
 
+  getCardByCardId(cardId: string) {
+    return this.db.prepare(`SELECT * FROM cards WHERE card_id = ?`).get(cardId) as
+      | { card_id: string; fund_request_id: string; limit_minor: number; merchant_cat: string | null; currency: string }
+      | undefined;
+  }
+
   getAuthorizations(limit = 100) {
     return this.db
       .prepare(`SELECT * FROM authorizations ORDER BY created_at DESC LIMIT ?`)
