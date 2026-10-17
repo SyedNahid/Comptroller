@@ -73,6 +73,10 @@ reconcile to agent+task → audit entry.
 4. **Trust you can see.** Per-task mandates + one-tap human approval + a self-filling
    audit timeline + an animated **"saved $X"** FX counter. Autonomy that looks
    *governed*, not reckless.
+4b. **Tamper-evident authority (Ed25519).** Each agent's mandate is cryptographically
+   signed by the operator (AP2 / Visa Trusted-Agent aligned). Edit a mandate without
+   re-signing and Comptroller **refuses every spend** — live-demoable: tamper → all
+   denied → re-sign → restored.
 5. **On the frontier.** Treasury built *for the AI agents themselves* — riding the
    hottest 2026 fintech theme (agentic commerce) while everyone else builds dashboards
    for humans.

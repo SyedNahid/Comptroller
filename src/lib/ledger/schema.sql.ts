@@ -72,6 +72,12 @@ CREATE TABLE IF NOT EXISTS clawbacks (
   created_at       TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS mandates (
+  agent_id     TEXT PRIMARY KEY,
+  signed_json  TEXT NOT NULL,
+  created_at   TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS audit_log (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
   ts               TEXT NOT NULL,

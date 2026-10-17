@@ -18,13 +18,18 @@ export function MissionControl({
 
   return (
     <>
-      <section className="px-6 py-3 border-b border-zinc-900 flex gap-3 flex-wrap">
+      <section className="px-6 py-3 border-b border-zinc-900 flex gap-3 flex-wrap items-center">
         <span className="text-[11px] text-zinc-500 uppercase self-center">Treasury</span>
         {(state?.balances ?? []).map((b) => (
           <span key={b.currency} className="px-2 py-1 rounded bg-zinc-900 text-xs tabular-nums">
             {b.currency} {b.available_amount.toLocaleString()}
           </span>
         ))}
+        {state?.operatorFingerprint && (
+          <span className="ml-auto text-[11px] text-zinc-500">
+            🔑 operator key <span className="text-zinc-400">{state.operatorFingerprint}</span>
+          </span>
+        )}
       </section>
 
       <main className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
@@ -32,22 +37,44 @@ export function MissionControl({
         <section>
           <h2 className="text-xs uppercase text-zinc-500 mb-3">Agent fleet</h2>
           <div className="space-y-3">
-            {(state?.agents ?? []).map((a) => (
-              <div key={a.agentId} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold">{a.displayName}</span>
-                  <span className="text-xs px-2 py-0.5 rounded bg-zinc-800">{a.baseCurrency}</span>
+            {(state?.agents ?? []).map((a) => {
+              const m = state?.mandates?.[a.agentId];
+              return (
+                <div key={a.agentId} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold">{a.displayName}</span>
+                    <span className="text-xs px-2 py-0.5 rounded bg-zinc-800">{a.baseCurrency}</span>
+                  </div>
+                  <div className="text-[11px] text-zinc-500 mt-1">
+                    per-task {formatMoney(a.perTaskCapMinor, a.baseCurrency)} · daily{" "}
+                    {formatMoney(a.dailyCapMinor, a.baseCurrency)} · auto ≤{" "}
+                    {formatMoney(a.autoApproveThresholdMinor, a.baseCurrency)}
+                  </div>
+                  <div className="text-[11px] text-zinc-600 mt-1">
+                    MCC {a.allowedMerchantCategories.join(", ") || "any"}
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span
+                      className={`text-[11px] ${m?.verified ? "text-emerald-400" : "text-rose-400"}`}
+                      title={m?.reason}
+                    >
+                      {m?.verified ? "🔐 mandate verified (Ed25519)" : `⚠ mandate invalid — ${m?.reason ?? "?"}`}
+                    </span>
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        run(() =>
+                          post(m?.verified ? "/api/mandate/tamper" : "/api/mandate/reseal", { agentId: a.agentId }),
+                        )
+                      }
+                      className="ml-auto text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50"
+                    >
+                      {m?.verified ? "Tamper" : "Re-sign"}
+                    </button>
+                  </div>
                 </div>
-                <div className="text-[11px] text-zinc-500 mt-1">
-                  per-task {formatMoney(a.perTaskCapMinor, a.baseCurrency)} · daily{" "}
-                  {formatMoney(a.dailyCapMinor, a.baseCurrency)} · auto ≤{" "}
-                  {formatMoney(a.autoApproveThresholdMinor, a.baseCurrency)}
-                </div>
-                <div className="text-[11px] text-zinc-600 mt-1">
-                  MCC {a.allowedMerchantCategories.join(", ") || "any"}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <h2 className="text-xs uppercase text-zinc-500 mt-6 mb-3">

@@ -32,6 +32,11 @@ an Airwallex account-config step (not a code issue).
 - ✅ **External Claude agent** (`scripts/agent.ts`) — connects over MCP, reasons, and
   spends through the governed wallet. `npm run agent` (scripted fallback without
   ANTHROPIC_API_KEY; real Claude tool-loop when a key is present).
+- ✅ **Multi-screen demo app** — Problem / Agent Console (live SSE stream of real
+  Groq agent) / Mission Control / Airwallex Proof, with top-nav.
+- ✅ **Signed mandates (Ed25519)** — operator-signed, tamper-evident agent authority
+  verified before any spend (AP2 / Visa Trusted-Agent aligned). Tamper → DENY;
+  re-sign → restored. Verified live. `src/lib/mandate/signing.ts`.
 - ✅ Pushed to GitHub: https://github.com/SyedNahid/Comptroller
 - ✅ Typecheck clean. Next 16 `cacheComponents` disabled (see FIXES).
 - ✅ Docs: CONTEXT / ARCHITECTURE / STATUS / FIXES / SUPPORT_REQUEST.

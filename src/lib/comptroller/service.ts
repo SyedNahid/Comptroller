@@ -15,6 +15,7 @@ import { randomUUID } from "node:crypto";
 import type { AirwallexClient } from "../airwallex/client";
 import { Ledger } from "../ledger/store";
 import { evaluateMandate } from "../mandate/engine";
+import { verifyMandate, type SignedMandate } from "../mandate/signing";
 import type { FundRequest, MandateDecision } from "../mandate/types";
 import { toMajor, toMinor, formatMoney } from "../money";
 import type { CardIssuer } from "./issuer";
@@ -43,7 +44,7 @@ export class Comptroller {
     private ledger: Ledger,
     private ax: AirwallexClient,
     private issuer: CardIssuer,
-    private opts: { treasuryReserveCurrency?: string } = {},
+    private opts: { treasuryReserveCurrency?: string; operatorPublicKeyPem?: string } = {},
   ) {}
 
   private reserve() {
@@ -55,6 +56,43 @@ export class Comptroller {
     const policy = this.ledger.getPolicy(req.agentId);
     if (!policy) {
       throw new Error(`No policy for agent ${req.agentId}`);
+    }
+
+    // Verify the agent's cryptographically signed mandate BEFORE anything else.
+    // No valid signature (or tampered/expired) → refuse to move money.
+    if (this.opts.operatorPublicKeyPem) {
+      const sm = this.ledger.getMandate<SignedMandate>(req.agentId);
+      const v = sm
+        ? verifyMandate(sm, this.opts.operatorPublicKeyPem)
+        : { valid: false, reason: "no signed mandate on file" };
+      if (!v.valid) {
+        const frId = this.ledger.createFundRequest({
+          agentId: req.agentId,
+          task: req.task,
+          amountMinor: req.amountMinor,
+          currency: req.currency,
+          merchantCategory: req.merchantCategory,
+          merchantName: req.merchantName,
+          decision: "DENY",
+          status: "DENIED",
+          reason: `Mandate not verified — ${v.reason}`,
+          createdAt: now,
+        });
+        this.ledger.appendAudit({
+          ts: now,
+          agentId: req.agentId,
+          fundRequestId: frId,
+          type: "MANDATE_INVALID",
+          message: `Refused — signed mandate failed verification: ${v.reason}`,
+        });
+        return {
+          fundRequestId: frId,
+          decision: "DENY",
+          reason: `Mandate not verified — ${v.reason}`,
+          status: "DENIED",
+          checks: [],
+        };
+      }
     }
 
     const spentToday = this.ledger.getSpentTodayMinor(req.agentId, req.currency);

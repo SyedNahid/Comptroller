@@ -301,6 +301,42 @@ export class Ledger {
     return row.total;
   }
 
+  // ---- Signed mandates ----------------------------------------------------
+
+  upsertMandate(agentId: string, signed: unknown, createdAt: string) {
+    this.db
+      .prepare(
+        `INSERT INTO mandates (agent_id, signed_json, created_at) VALUES (?, ?, ?)
+         ON CONFLICT(agent_id) DO UPDATE SET signed_json = excluded.signed_json,
+           created_at = excluded.created_at`,
+      )
+      .run(agentId, JSON.stringify(signed), createdAt);
+  }
+
+  getMandate<T = unknown>(agentId: string): T | undefined {
+    const row = this.db
+      .prepare(`SELECT signed_json FROM mandates WHERE agent_id = ?`)
+      .get(agentId) as { signed_json: string } | undefined;
+    return row ? (JSON.parse(row.signed_json) as T) : undefined;
+  }
+
+  countMandates(): number {
+    const row = this.db.prepare(`SELECT COUNT(*) AS n FROM mandates`).get() as { n: number };
+    return row.n;
+  }
+
+  /** Demo: corrupt a stored mandate's signature so verification fails. */
+  tamperMandate(agentId: string) {
+    const row = this.db
+      .prepare(`SELECT signed_json FROM mandates WHERE agent_id = ?`)
+      .get(agentId) as { signed_json: string } | undefined;
+    if (!row) return;
+    const sm = JSON.parse(row.signed_json) as { doc: { constraints: { perTaskCapMinor: number } } };
+    // Raise the cap WITHOUT re-signing — signature no longer matches the doc.
+    sm.doc.constraints.perTaskCapMinor += 10_000_00;
+    this.db.prepare(`UPDATE mandates SET signed_json = ? WHERE agent_id = ?`).run(JSON.stringify(sm), agentId);
+  }
+
   // ---- Audit --------------------------------------------------------------
 
   appendAudit(entry: {

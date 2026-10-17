@@ -29,8 +29,14 @@ export interface Balance {
   currency: string;
   available_amount: number;
 }
+export interface MandateStatus {
+  verified: boolean;
+  reason: string;
+}
 export interface State {
   issuingKind: string;
+  operatorFingerprint: string;
+  mandates: Record<string, MandateStatus>;
   agents: AgentPolicy[];
   requests: FundRequestRow[];
   audit: AuditRow[];
@@ -53,4 +59,7 @@ export const AUDIT_STYLE: Record<string, string> = {
   AUTH_AUTHORIZED: "text-emerald-400",
   AUTH_DECLINED: "text-rose-400",
   CLAWBACK: "text-teal-400",
+  MANDATE_INVALID: "text-rose-400",
+  MANDATE_TAMPERED: "text-rose-400",
+  MANDATE_RESEALED: "text-emerald-400",
 };
