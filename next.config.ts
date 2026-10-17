@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  /* Comptroller uses dynamic route handlers (ledger reads + live FX) and the
+   * node runtime (node:sqlite), which are incompatible with cacheComponents. */
+  cacheComponents: false,
   turbopack: {
     rules: {
       "*.css": {

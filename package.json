@@ -6,21 +6,26 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "spike": "tsx scripts/spike.ts",
+    "demo:mandate": "tsx scripts/demo-mandate.ts",
+    "demo:e2e": "tsx scripts/demo-e2e.ts"
   },
   "dependencies": {
+    "dotenv": "^18.0.8",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
-    "@types/node": "^20",
+    "@types/node": "^26.6.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }
