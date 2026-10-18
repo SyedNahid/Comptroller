@@ -269,6 +269,99 @@ export class Comptroller {
   }
 
   /**
+   * Real supplier payout — a governed Airwallex transfer (money actually leaves
+   * the account). Same mandate gate as a card request; this is the "real money
+   * movement" path that works today without card issuing.
+   */
+  async payBeneficiary(
+    input: { agentId: string; task: string; amountMinor: number; currency: string; supplierName: string; merchantCategory?: string },
+    now = new Date().toISOString(),
+  ): Promise<{ decision: string; reason: string; transferId?: string; feeMinor?: number }> {
+    const policy = this.ledger.getPolicy(input.agentId);
+    if (!policy) throw new Error(`No policy for agent ${input.agentId}`);
+
+    // Mandate chain + policy evaluation (identical trust gate as card funding).
+    if (this.opts.operatorPublicKeyPem) {
+      const sm = this.ledger.getMandate<SignedMandate>(input.agentId);
+      const v = sm
+        ? verifyChain(sm, (id) => this.ledger.getMandate<SignedMandate>(id), this.opts.operatorPublicKeyPem, (n) => this.ledger.isRevoked(n))
+        : { valid: false, reason: "no signed mandate" };
+      if (!v.valid) return { decision: "DENY", reason: `Mandate not verified — ${v.reason}` };
+    }
+    const spent = this.ledger.getSpentTodayMinor(input.agentId, input.currency);
+    const decision = evaluateMandate(
+      { agentId: input.agentId, task: input.task, amountMinor: input.amountMinor, currency: input.currency, merchantCategory: input.merchantCategory },
+      policy,
+      spent,
+    );
+    const frId = this.ledger.createFundRequest({
+      agentId: input.agentId,
+      task: input.task,
+      amountMinor: input.amountMinor,
+      currency: input.currency,
+      merchantCategory: input.merchantCategory,
+      merchantName: input.supplierName,
+      decision: decision.decision,
+      status: decision.decision === "AUTO_APPROVE" ? "FUNDED" : decision.decision === "NEEDS_HUMAN" ? "PENDING_APPROVAL" : "DENIED",
+      reason: decision.reason,
+      createdAt: now,
+    });
+    this.ledger.appendAudit({ ts: now, agentId: input.agentId, fundRequestId: frId, type: `MANDATE_${decision.decision}`, message: decision.reason });
+    if (decision.decision !== "AUTO_APPROVE") {
+      return { decision: decision.decision, reason: decision.reason };
+    }
+
+    // Execute a real Airwallex transfer to the supplier (USD/ACH beneficiary).
+    const transfer = (await this.ax.createTransfer({
+      request_id: randomUUID(),
+      transfer_amount: String(toMajor(input.amountMinor)),
+      transfer_currency: input.currency,
+      transfer_method: "LOCAL",
+      source_currency: input.currency,
+      reason: "goods",
+      reference: `Comptroller ${input.task}`,
+      transfer_date: now.slice(0, 10),
+      beneficiary: {
+        entity_type: "COMPANY",
+        company_name: input.supplierName,
+        address: { city: "Seattle", country_code: "US", postcode: "98104", state: "Washington", street_address: "412 5th Avenue" },
+        bank_details: {
+          account_currency: input.currency,
+          account_name: input.supplierName,
+          account_number: "50001121",
+          account_routing_type1: "aba",
+          account_routing_value1: "021000021",
+          bank_country_code: "US",
+          bank_account_category: "Checking",
+          local_clearing_system: "ACH",
+        },
+      },
+    })) as { id?: string; short_reference_id?: string; status?: string; fee_amount?: number };
+
+    const feeMinor = toMinor(transfer.fee_amount ?? 0);
+    this.ledger.recordTransfer({
+      fundRequestId: frId,
+      transferId: transfer.id,
+      shortRef: transfer.short_reference_id,
+      beneficiary: input.supplierName,
+      amountMinor: input.amountMinor,
+      currency: input.currency,
+      feeMinor,
+      status: transfer.status ?? "SCHEDULED",
+      createdAt: now,
+    });
+    this.ledger.appendAudit({
+      ts: now,
+      agentId: input.agentId,
+      fundRequestId: frId,
+      type: "PAYOUT_SENT",
+      message: `Real transfer ${formatMoney(input.amountMinor, input.currency)} → ${input.supplierName} (${transfer.status}, ref ${transfer.short_reference_id})`,
+      data: { transferId: transfer.id },
+    });
+    return { decision: "AUTO_APPROVE", reason: "Transfer sent", transferId: transfer.id, feeMinor };
+  }
+
+  /**
    * Simulate the agent spending on its card, authorize against the scope, then
    * reconcile + claw back the residual. Mirrors what native spend controls /
    * remote authorization will do once issuing is live.

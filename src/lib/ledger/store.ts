@@ -60,6 +60,7 @@ export class Ledger {
       "cards",
       "authorizations",
       "clawbacks",
+      "transfers",
       "audit_log",
       "revocations",
     ]) {
@@ -275,6 +276,43 @@ export class Ledger {
          VALUES (?, ?, ?, ?, ?)`,
       )
       .run(randomUUID(), c.fundRequestId, c.cardId, c.residualMinor, c.createdAt);
+  }
+
+  recordTransfer(t: {
+    fundRequestId: string;
+    transferId?: string;
+    shortRef?: string;
+    beneficiary: string;
+    amountMinor: number;
+    currency: string;
+    feeMinor: number;
+    status: string;
+    createdAt: string;
+  }) {
+    this.db
+      .prepare(
+        `INSERT INTO transfers
+          (id, fund_request_id, transfer_id, short_ref, beneficiary, amount_minor, currency, fee_minor, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        randomUUID(),
+        t.fundRequestId,
+        t.transferId ?? null,
+        t.shortRef ?? null,
+        t.beneficiary,
+        t.amountMinor,
+        t.currency,
+        t.feeMinor,
+        t.status,
+        t.createdAt,
+      );
+  }
+
+  getTransfers(limit = 100) {
+    return this.db
+      .prepare(`SELECT * FROM transfers ORDER BY created_at DESC LIMIT ?`)
+      .all(limit) as unknown as Record<string, unknown>[];
   }
 
   getConversions(limit = 100) {

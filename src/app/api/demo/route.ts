@@ -30,5 +30,14 @@ export async function POST() {
     agentId: "saas-procurement", task: "Notion enterprise", amountMinor: toMinor(350), currency: "EUR", merchantCategory: "7372", merchantName: "Notion",
   });
 
+  // A REAL supplier payout (money actually leaves the account via Airwallex).
+  try {
+    await comptroller.payBeneficiary({
+      agentId: "ad-buyer", task: "creative studio invoice", amountMinor: toMinor(120), currency: "USD", supplierName: "Pixel Studio LLC", merchantCategory: "7311",
+    });
+  } catch {
+    /* payout scope may be absent in some sandboxes; demo continues */
+  }
+
   return NextResponse.json({ ok: true });
 }

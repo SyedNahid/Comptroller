@@ -50,6 +50,7 @@ export async function GET() {
     requests: ledger.getFundRequests(50),
     conversions: ledger.getConversions(50),
     cards: ledger.getCards(50),
+    transfers: ledger.getTransfers(50),
     authorizations: ledger.getAuthorizations(50),
     audit: ledger.getAuditLog(60),
     totalSavedMinor: ledger.totalSavedMinor(),

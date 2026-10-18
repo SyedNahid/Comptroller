@@ -195,8 +195,8 @@ export class AirwallexClient {
     account_currency: string;
     bank_country_code: string;
     entity_type: string; // COMPANY | PERSONAL
+    payment_method: string; // LOCAL | SWIFT
     local_clearing_system?: string;
-    transfer_method?: string; // LOCAL | SWIFT
   }) {
     return this.request("POST", "/api/v1/beneficiary_api_schemas/generate", {
       body,
@@ -206,10 +206,7 @@ export class AirwallexClient {
 
   /** Create a transfer (payout) with an inline beneficiary. */
   createTransfer(body: unknown) {
-    return this.request("POST", "/api/v1/transfers/create", {
-      body,
-      apiVersion: FX_API_VERSION,
-    });
+    return this.request("POST", "/api/v1/transfers/create", { body });
   }
 
   /** Sandbox: push a transfer to a terminal state. */

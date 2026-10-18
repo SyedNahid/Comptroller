@@ -43,6 +43,10 @@ an Airwallex account-config step (not a code issue).
 - ✅ **Remote-auth webhook** (`/api/airwallex/remote-auth`) — HMAC-verified real-time
   approve/decline enforcing card scope; dormant until issuing enabled, correct contract.
 - ✅ **Reconciliation CSV export** (`/api/export/reconciliation`) + dashboard button.
+- ✅ **Delegated mandates** — cryptographic capability attenuation (crown feature).
+- ✅ **Real payouts** — governed Airwallex transfers (real money movement, works today);
+  off-mandate denied. `payBeneficiary` + /api/payout + Proof view.
+- ✅ **UI redesign** (clean fintech SaaS) + delegation tree + prompt-injection demo.
 - ✅ Pushed to GitHub: https://github.com/SyedNahid/Comptroller (latest commits local-only)
 - ✅ Typecheck clean. Next 16 `cacheComponents` disabled (see FIXES).
 - ✅ Docs: CONTEXT / ARCHITECTURE / STATUS / FIXES / SUPPORT_REQUEST.

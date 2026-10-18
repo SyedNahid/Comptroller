@@ -47,6 +47,15 @@ export interface State {
   conversions?: unknown[];
   cards?: unknown[];
   authorizations?: unknown[];
+  transfers?: {
+    transfer_id: string | null;
+    short_ref: string | null;
+    beneficiary: string;
+    amount_minor: number;
+    currency: string;
+    fee_minor: number;
+    status: string;
+  }[];
 }
 
 import type { ComponentProps } from "react";
@@ -77,4 +86,5 @@ export const AUDIT_META: Record<string, { tone: Tone; dot: string }> = {
   POLICY_UPDATED: { tone: "indigo", dot: "bg-indigo-500" },
   DELEGATED: { tone: "violet", dot: "bg-violet-500" },
   MANDATE_REVOKED: { tone: "rose", dot: "bg-rose-500" },
+  PAYOUT_SENT: { tone: "teal", dot: "bg-teal-500" },
 };

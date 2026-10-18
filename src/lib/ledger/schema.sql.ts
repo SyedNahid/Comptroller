@@ -64,6 +64,19 @@ CREATE TABLE IF NOT EXISTS authorizations (
   created_at       TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS transfers (
+  id               TEXT PRIMARY KEY,
+  fund_request_id  TEXT,
+  transfer_id      TEXT,              -- Airwallex transfer id
+  short_ref        TEXT,
+  beneficiary      TEXT,
+  amount_minor     INTEGER,
+  currency         TEXT,
+  fee_minor        INTEGER,
+  status           TEXT,
+  created_at       TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS clawbacks (
   id               TEXT PRIMARY KEY,
   fund_request_id  TEXT,

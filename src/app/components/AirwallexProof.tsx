@@ -34,6 +34,27 @@ export function AirwallexProof({ state }: { state: State | null }) {
         </Card>
       </div>
 
+      {(state?.transfers?.length ?? 0) > 0 && (
+        <Card className="p-5">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Real supplier payouts (live transfers)</div>
+            <Pill tone="teal">money moved</Pill>
+          </div>
+          <div className="mt-3 divide-y divide-gray-100">
+            {state!.transfers!.slice(0, 6).map((t, i) => (
+              <div key={i} className="flex items-center justify-between py-2 text-sm">
+                <span className="text-gray-700">{t.beneficiary}</span>
+                <span className="flex items-center gap-3">
+                  <span className="nums text-gray-500">{formatMoney(t.amount_minor, t.currency)}</span>
+                  <span className="nums text-xs text-gray-400">{t.short_ref ?? t.transfer_id?.slice(0, 8)}</span>
+                  <Pill tone="emerald">{t.status}</Pill>
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card className="p-5">
         <ol className="list-inside list-decimal space-y-1.5 text-sm text-gray-600">
           <li>Open the Airwallex sandbox web app → <b>FX / Conversions</b>.</li>

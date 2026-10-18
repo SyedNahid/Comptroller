@@ -155,6 +155,9 @@ reconcile to agent+task → audit entry.
 ## 8. What's real vs simulated (say this — judges trust honesty)
 - **Real / live:** Airwallex auth, balances, **FX conversions**; the **LLM agent**
   (Groq) reasoning + tool-calling; the mandate engine, ledger, audit, clawback logic.
+- **Real / live (money movement):** governed **supplier payouts** execute as real
+  Airwallex **transfers** (status + fee returned) through the mandate gate — undeniable
+  money movement that works today, no card issuing required.
 - **Simulated (one flag away):** card **issuance** and charge **authorization** — the
   sandbox issuing program isn't enabled yet (request sent to `devhelp@airwallex.com`).
   Code is ready behind a `CardIssuer` interface; flip `COMPTROLLER_ISSUING=live` to go
