@@ -32,6 +32,8 @@ export interface Balance {
 export interface MandateStatus {
   verified: boolean;
   reason: string;
+  issuer?: string;
+  depth?: number;
 }
 export interface State {
   issuingKind: string;
@@ -42,25 +44,37 @@ export interface State {
   audit: AuditRow[];
   totalSavedMinor: number;
   balances: Balance[];
+  conversions?: unknown[];
+  cards?: unknown[];
+  authorizations?: unknown[];
 }
 
-export const DECISION_STYLE: Record<string, string> = {
-  AUTO_APPROVE: "text-emerald-400",
-  NEEDS_HUMAN: "text-amber-400",
-  DENY: "text-rose-400",
+import type { ComponentProps } from "react";
+import { Pill } from "./ui";
+
+type Tone = ComponentProps<typeof Pill>["tone"];
+
+export const DECISION_TONE: Record<string, Tone> = {
+  AUTO_APPROVE: "emerald",
+  NEEDS_HUMAN: "amber",
+  DENY: "rose",
 };
-export const AUDIT_STYLE: Record<string, string> = {
-  MANDATE_AUTO_APPROVE: "text-emerald-400",
-  MANDATE_NEEDS_HUMAN: "text-amber-400",
-  MANDATE_DENY: "text-rose-400",
-  FX_CONVERTED: "text-sky-400",
-  CARD_ISSUED: "text-violet-400",
-  HUMAN_APPROVED: "text-amber-300",
-  AUTH_AUTHORIZED: "text-emerald-400",
-  AUTH_DECLINED: "text-rose-400",
-  CLAWBACK: "text-teal-400",
-  MANDATE_INVALID: "text-rose-400",
-  MANDATE_TAMPERED: "text-rose-400",
-  MANDATE_RESEALED: "text-emerald-400",
-  POLICY_UPDATED: "text-indigo-400",
+
+/** Audit event → {tone, dot-color, label} for the activity feed. */
+export const AUDIT_META: Record<string, { tone: Tone; dot: string }> = {
+  MANDATE_AUTO_APPROVE: { tone: "emerald", dot: "bg-emerald-500" },
+  MANDATE_NEEDS_HUMAN: { tone: "amber", dot: "bg-amber-500" },
+  MANDATE_DENY: { tone: "rose", dot: "bg-rose-500" },
+  FX_CONVERTED: { tone: "sky", dot: "bg-sky-500" },
+  CARD_ISSUED: { tone: "violet", dot: "bg-violet-500" },
+  HUMAN_APPROVED: { tone: "amber", dot: "bg-amber-500" },
+  AUTH_AUTHORIZED: { tone: "emerald", dot: "bg-emerald-500" },
+  AUTH_DECLINED: { tone: "rose", dot: "bg-rose-500" },
+  CLAWBACK: { tone: "teal", dot: "bg-teal-500" },
+  MANDATE_INVALID: { tone: "rose", dot: "bg-rose-500" },
+  MANDATE_TAMPERED: { tone: "rose", dot: "bg-rose-500" },
+  MANDATE_RESEALED: { tone: "emerald", dot: "bg-emerald-500" },
+  POLICY_UPDATED: { tone: "indigo", dot: "bg-indigo-500" },
+  DELEGATED: { tone: "violet", dot: "bg-violet-500" },
+  MANDATE_REVOKED: { tone: "rose", dot: "bg-rose-500" },
 };

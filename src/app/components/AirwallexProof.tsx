@@ -2,53 +2,57 @@
 
 import { formatMoney } from "@/lib/money";
 import type { State } from "./types";
+import { Card, Pill } from "./ui";
 
 export function AirwallexProof({ state }: { state: State | null }) {
   const saved = state ? formatMoney(state.totalSavedMinor, "USD") : "—";
   return (
-    <div className="max-w-3xl mx-auto py-10 px-6 space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Proof: it&apos;s real money</h2>
-        <p className="text-sm text-zinc-400 mt-1">
-          Comptroller&apos;s FX conversions execute on the live Airwallex sandbox — not a
-          mock. Open the Airwallex dashboard and you&apos;ll see the exact conversions.
+        <Pill tone="emerald">Live sandbox</Pill>
+        <h1 className="mt-2 text-xl font-semibold text-gray-900">It’s real money</h1>
+        <p className="text-sm text-gray-500">
+          Comptroller’s FX conversions execute on the live Airwallex sandbox — not a mock.
+          Open the Airwallex dashboard and you’ll see the exact conversions.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-          <div className="text-[11px] uppercase text-zinc-500">Treasury balances (live)</div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="p-5">
+          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Treasury balances (live)</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {(state?.balances ?? []).map((b) => (
-              <span key={b.currency} className="px-2 py-1 rounded bg-zinc-800 text-xs tabular-nums">
+              <span key={b.currency} className="nums rounded-lg bg-gray-50 px-2.5 py-1 text-xs text-gray-700 ring-1 ring-inset ring-gray-200">
                 {b.currency} {b.available_amount.toLocaleString()}
               </span>
             ))}
           </div>
-        </div>
-        <div className="rounded-lg border border-emerald-800/50 bg-emerald-950/20 p-4">
-          <div className="text-[11px] uppercase text-zinc-500">Est. FX saved vs bank</div>
-          <div className="mt-2 text-3xl font-bold text-emerald-400 tabular-nums">{saved}</div>
-        </div>
+        </Card>
+        <Card className="p-5">
+          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Est. FX saved vs bank</div>
+          <div className="nums mt-1 text-4xl font-semibold text-emerald-600">{saved}</div>
+        </Card>
       </div>
 
-      <ol className="list-decimal list-inside text-sm text-zinc-300 space-y-1">
-        <li>Open the Airwallex sandbox web app → <b>FX / Conversions</b>.</li>
-        <li>Each approved request here created a real conversion there (match the timestamps / IDs).</li>
-        <li>
-          Card issuance is <b>one flag away</b> (<code className="text-xs bg-zinc-800 px-1 rounded">COMPTROLLER_ISSUING=live</code>)
-          once Airwallex enables the sandbox issuing program.
-        </li>
-      </ol>
-
-      <a
-        href="https://www.airwallex.com/app/login"
-        target="_blank"
-        rel="noreferrer"
-        className="inline-block px-4 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-sm"
-      >
-        Open Airwallex dashboard ↗
-      </a>
+      <Card className="p-5">
+        <ol className="list-inside list-decimal space-y-1.5 text-sm text-gray-600">
+          <li>Open the Airwallex sandbox web app → <b>FX / Conversions</b>.</li>
+          <li>Each approved request here created a real conversion there (match the timestamps / IDs).</li>
+          <li>
+            Card issuance is <b>one flag away</b>{" "}
+            (<code className="rounded bg-gray-100 px-1 py-0.5 text-xs">COMPTROLLER_ISSUING=live</code>) once Airwallex
+            enables the sandbox issuing program.
+          </li>
+        </ol>
+        <a
+          href="https://www.airwallex.com/app/login"
+          target="_blank"
+          rel="noreferrer"
+          className="mt-4 inline-block rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Open Airwallex dashboard ↗
+        </a>
+      </Card>
     </div>
   );
 }

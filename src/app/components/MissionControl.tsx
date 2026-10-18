@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { formatMoney } from "@/lib/money";
-import { DECISION_STYLE, AUDIT_STYLE, type State } from "./types";
+import { DECISION_TONE, AUDIT_META, type State } from "./types";
+import { Card, Pill, useCountUp } from "./ui";
 
 export function MissionControl({
   state,
@@ -16,182 +17,188 @@ export function MissionControl({
   post: (url: string, body?: unknown) => Promise<void>;
 }) {
   const pending = state?.requests.filter((r) => r.status === "PENDING_APPROVAL") ?? [];
+  const funded = state?.requests.filter((r) => r.status === "FUNDED" || r.status === "SETTLED").length ?? 0;
+  const saved = useCountUp((state?.totalSavedMinor ?? 0) / 100);
   const [editing, setEditing] = useState<string | null>(null);
   const [text, setText] = useState("");
 
   return (
-    <>
-      <section className="px-6 py-3 border-b border-zinc-900 flex gap-3 flex-wrap items-center">
-        <span className="text-[11px] text-zinc-500 uppercase self-center">Treasury</span>
-        {(state?.balances ?? []).map((b) => (
-          <span key={b.currency} className="px-2 py-1 rounded bg-zinc-900 text-xs tabular-nums">
-            {b.currency} {b.available_amount.toLocaleString()}
-          </span>
-        ))}
-        <div className="ml-auto flex items-center gap-3">
-          {state?.operatorFingerprint && (
-            <span className="text-[11px] text-zinc-500">
-              🔑 operator key <span className="text-zinc-400">{state.operatorFingerprint}</span>
+    <div className="space-y-6">
+      {/* Top stats */}
+      <div className="grid gap-4 sm:grid-cols-4">
+        <Card className="p-5 sm:col-span-2">
+          <div className="text-xs font-medium uppercase tracking-wide text-gray-400">Estimated FX saved vs bank</div>
+          <div className="mt-1 nums text-4xl font-semibold text-emerald-600">
+            ${saved.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="mt-1 text-xs text-gray-400">across {state?.conversions?.length ?? 0} live conversions</div>
+        </Card>
+        <Stat label="Agents" value={String(state?.agents.length ?? 0)} />
+        <Stat
+          label="Pending"
+          value={String(pending.length)}
+          tone={pending.length ? "amber" : "gray"}
+        />
+      </div>
+
+      {/* Treasury balances */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-gray-400">Treasury</span>
+          {(state?.balances ?? []).map((b) => (
+            <span key={b.currency} className="nums rounded-lg bg-gray-50 px-2.5 py-1 text-xs text-gray-700 ring-1 ring-inset ring-gray-200">
+              {b.currency} {b.available_amount.toLocaleString()}
             </span>
-          )}
-          <a
-            href="/api/export/reconciliation"
-            className="text-[11px] px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
-          >
-            ⬇ Export CSV
-          </a>
+          ))}
+          <span className="ml-auto flex items-center gap-3">
+            {state?.operatorFingerprint && (
+              <span className="nums text-xs text-gray-400">🔑 {state.operatorFingerprint}</span>
+            )}
+            <a href="/api/export/reconciliation" className="text-xs font-medium text-indigo-600 hover:text-indigo-500">
+              Export CSV ↓
+            </a>
+          </span>
         </div>
-      </section>
+      </Card>
 
-      <main className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
-        {/* Fleet + approvals */}
-        <section>
-          <h2 className="text-xs uppercase text-zinc-500 mb-3">Agent fleet</h2>
-          <div className="space-y-3">
-            {(state?.agents ?? []).map((a) => {
-              const m = state?.mandates?.[a.agentId];
-              return (
-                <div key={a.agentId} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold">{a.displayName}</span>
-                    <span className="text-xs px-2 py-0.5 rounded bg-zinc-800">{a.baseCurrency}</span>
-                  </div>
-                  <div className="text-[11px] text-zinc-500 mt-1">
-                    per-task {formatMoney(a.perTaskCapMinor, a.baseCurrency)} · daily{" "}
-                    {formatMoney(a.dailyCapMinor, a.baseCurrency)} · auto ≤{" "}
-                    {formatMoney(a.autoApproveThresholdMinor, a.baseCurrency)}
-                  </div>
-                  <div className="text-[11px] text-zinc-600 mt-1">
-                    MCC {a.allowedMerchantCategories.join(", ") || "any"}
-                  </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <span
-                      className={`text-[11px] ${m?.verified ? "text-emerald-400" : "text-rose-400"}`}
-                      title={m?.reason}
-                    >
-                      {m?.verified ? "🔐 mandate verified (Ed25519)" : `⚠ mandate invalid — ${m?.reason ?? "?"}`}
-                    </span>
-                    <div className="ml-auto flex gap-1">
-                      <button
-                        disabled={busy}
-                        onClick={() => {
-                          setEditing(editing === a.agentId ? null : a.agentId);
-                          setText("");
-                        }}
-                        className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50"
-                      >
-                        ✎ policy
-                      </button>
-                      <button
-                        disabled={busy}
-                        onClick={() =>
-                          run(() =>
-                            post(m?.verified ? "/api/mandate/tamper" : "/api/mandate/reseal", { agentId: a.agentId }),
-                          )
-                        }
-                        className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50"
-                      >
-                        {m?.verified ? "Tamper" : "Re-sign"}
-                      </button>
-                    </div>
-                  </div>
-
-                  {editing === a.agentId && (
-                    <div className="mt-2 space-y-2">
-                      <textarea
-                        value={text}
-                        onChange={(e) => setText(e.target.value)}
-                        placeholder={`e.g. "Let the ${a.agentId} spend up to $750/day on ads and cloud, auto-approve under $200"`}
-                        rows={2}
-                        className="w-full rounded bg-zinc-900 border border-zinc-800 p-2 text-[11px]"
-                      />
-                      <button
-                        disabled={busy || !text.trim()}
-                        onClick={() =>
-                          run(async () => {
-                            await post("/api/policy/compile", { agentId: a.agentId, text });
-                            setEditing(null);
-                            setText("");
-                          })
-                        }
-                        className="text-[10px] px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50"
-                      >
-                        {busy ? "Compiling…" : "Compile & re-sign (LLM)"}
-                      </button>
-                    </div>
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Fleet */}
+        <section className="space-y-3 lg:col-span-1">
+          <h2 className="text-sm font-semibold text-gray-900">Agent fleet</h2>
+          {(state?.agents ?? []).map((a) => {
+            const m = state?.mandates?.[a.agentId];
+            const delegated = (m?.issuer ?? "operator") !== "operator";
+            return (
+              <Card key={a.agentId} className="p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-gray-900">{a.displayName}</span>
+                  <Pill tone="gray">{a.baseCurrency}</Pill>
+                </div>
+                <div className="mt-1 nums text-xs text-gray-500">
+                  per-task {formatMoney(a.perTaskCapMinor, a.baseCurrency)} · auto ≤{" "}
+                  {formatMoney(a.autoApproveThresholdMinor, a.baseCurrency)}
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  {m?.verified ? (
+                    <Pill tone={delegated ? "violet" : "emerald"}>
+                      {delegated ? `🔗 delegated · depth ${m.depth}` : "🔐 verified"}
+                    </Pill>
+                  ) : (
+                    <Pill tone="rose">⚠ {m?.reason ?? "invalid"}</Pill>
                   )}
+                  <button
+                    disabled={busy}
+                    onClick={() => {
+                      setEditing(editing === a.agentId ? null : a.agentId);
+                      setText("");
+                    }}
+                    className="ml-auto text-xs font-medium text-indigo-600 hover:text-indigo-500 disabled:opacity-50"
+                  >
+                    edit policy
+                  </button>
+                </div>
+                {editing === a.agentId && (
+                  <div className="mt-3 space-y-2">
+                    <textarea
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                      rows={2}
+                      placeholder={`"Let ${a.agentId} spend up to $750/day on ads, auto-approve under $200"`}
+                      className="w-full rounded-lg border border-gray-200 bg-gray-50 p-2 text-xs text-gray-700 focus:border-indigo-400 focus:outline-none"
+                    />
+                    <button
+                      disabled={busy || !text.trim()}
+                      onClick={() =>
+                        run(async () => {
+                          await post("/api/policy/compile", { agentId: a.agentId, text });
+                          setEditing(null);
+                          setText("");
+                        })
+                      }
+                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+                    >
+                      {busy ? "Compiling…" : "Compile & re-sign (AI)"}
+                    </button>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </section>
+
+        {/* Requests + approvals */}
+        <section className="space-y-3 lg:col-span-1">
+          <h2 className="text-sm font-semibold text-gray-900">
+            Fund requests {pending.length > 0 && <span className="text-amber-600">· {pending.length} pending</span>}
+          </h2>
+          {pending.map((r) => (
+            <Card key={r.id} className="animate-rowin border-amber-200 bg-amber-50/40 p-4">
+              <div className="text-sm font-medium text-gray-900">{r.agent_id} · {r.task}</div>
+              <div className="nums text-xs text-gray-500">
+                {formatMoney(r.amount_minor, r.currency)} → {r.merchant_name}
+              </div>
+              <button
+                disabled={busy}
+                onClick={() => run(() => post("/api/approve", { id: r.id }))}
+                className="mt-2 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-400 disabled:opacity-50"
+              >
+                ✋ Approve
+              </button>
+            </Card>
+          ))}
+          {(state?.requests ?? [])
+            .filter((r) => r.status !== "PENDING_APPROVAL")
+            .slice(0, 8)
+            .map((r) => (
+              <Card key={r.id} className={`p-3.5 ${r.decision === "DENY" ? "animate-flashred" : ""}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-900">{r.agent_id}</span>
+                  <Pill tone={DECISION_TONE[r.decision] ?? "gray"}>{r.decision}</Pill>
+                </div>
+                <div className="nums text-xs text-gray-500">
+                  {formatMoney(r.amount_minor, r.currency)}
+                  {r.merchant_name ? ` → ${r.merchant_name}` : ""} · {r.task}
+                </div>
+              </Card>
+            ))}
+          {(state?.requests.length ?? 0) === 0 && (
+            <p className="text-sm text-gray-400">No requests yet — click “Run demo” or use the Agent Console.</p>
+          )}
+        </section>
+
+        {/* Activity feed */}
+        <section className="space-y-3 lg:col-span-1">
+          <h2 className="text-sm font-semibold text-gray-900">Activity</h2>
+          <Card className="divide-y divide-gray-100 p-0">
+            {(state?.audit ?? []).slice(0, 18).map((a) => {
+              const meta = AUDIT_META[a.type] ?? { tone: "gray" as const, dot: "bg-gray-400" };
+              return (
+                <div key={a.id} className="flex items-start gap-2.5 p-3">
+                  <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${meta.dot}`} />
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-medium text-gray-400">{a.type.replace(/_/g, " ")}</div>
+                    <div className="text-xs text-gray-700">{a.message}</div>
+                  </div>
                 </div>
               );
             })}
-          </div>
-
-          <h2 className="text-xs uppercase text-zinc-500 mt-6 mb-3">
-            Pending approvals{" "}
-            {pending.length > 0 && <span className="text-amber-400">({pending.length})</span>}
-          </h2>
-          <div className="space-y-2">
-            {pending.length === 0 && <p className="text-xs text-zinc-600">None.</p>}
-            {pending.map((r) => (
-              <div key={r.id} className="rounded-lg border border-amber-700/50 bg-amber-950/20 p-3">
-                <div className="text-sm">
-                  {r.agent_id} · {r.task}
-                </div>
-                <div className="text-xs text-zinc-400">
-                  {formatMoney(r.amount_minor, r.currency)} → {r.merchant_name}
-                </div>
-                <button
-                  disabled={busy}
-                  onClick={() => run(() => post("/api/approve", { id: r.id }))}
-                  className="mt-2 px-3 py-1 rounded bg-amber-600 hover:bg-amber-500 text-xs font-semibold disabled:opacity-50"
-                >
-                  ✋ Approve
-                </button>
-              </div>
-            ))}
-          </div>
+            {(state?.audit.length ?? 0) === 0 && <div className="p-4 text-sm text-gray-400">Quiet.</div>}
+          </Card>
         </section>
+      </div>
 
-        {/* Requests */}
-        <section>
-          <h2 className="text-xs uppercase text-zinc-500 mb-3">Fund requests</h2>
-          <div className="space-y-2">
-            {(state?.requests ?? []).map((r) => (
-              <div key={r.id} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
-                <div className="flex justify-between">
-                  <span className="text-sm">
-                    {r.agent_id} · {r.task}
-                  </span>
-                  <span className={`text-xs font-semibold ${DECISION_STYLE[r.decision] ?? ""}`}>
-                    {r.decision}
-                  </span>
-                </div>
-                <div className="text-xs text-zinc-400">
-                  {formatMoney(r.amount_minor, r.currency)}
-                  {r.merchant_name ? ` → ${r.merchant_name}` : ""} ·{" "}
-                  <span className="text-zinc-500">{r.status}</span>
-                </div>
-              </div>
-            ))}
-            {(state?.requests.length ?? 0) === 0 && (
-              <p className="text-xs text-zinc-600">No requests yet — hit “Run demo” or use the Agent Console.</p>
-            )}
-          </div>
-        </section>
+      <p className="text-center text-xs text-gray-400">{funded} funded · deterministic mandate engine · immutable audit</p>
+    </div>
+  );
+}
 
-        {/* Audit timeline */}
-        <section>
-          <h2 className="text-xs uppercase text-zinc-500 mb-3">Audit timeline</h2>
-          <div className="space-y-1.5">
-            {(state?.audit ?? []).map((a) => (
-              <div key={a.id} className="text-[11px] leading-relaxed">
-                <span className={`font-semibold ${AUDIT_STYLE[a.type] ?? "text-zinc-400"}`}>{a.type}</span>{" "}
-                <span className="text-zinc-400">{a.message}</span>
-              </div>
-            ))}
-            {(state?.audit.length ?? 0) === 0 && <p className="text-xs text-zinc-600">Quiet.</p>}
-          </div>
-        </section>
-      </main>
-    </>
+function Stat({ label, value, tone = "gray" }: { label: string; value: string; tone?: "gray" | "amber" }) {
+  return (
+    <Card className="p-5">
+      <div className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</div>
+      <div className={`mt-1 nums text-4xl font-semibold ${tone === "amber" ? "text-amber-600" : "text-gray-900"}`}>
+        {value}
+      </div>
+    </Card>
   );
 }
