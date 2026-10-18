@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getComptroller } from "@/lib/comptroller/instance";
 import { airwallexFromEnv } from "@/lib/airwallex/client";
-import { verifyMandate, type SignedMandate } from "@/lib/mandate/signing";
+import { verifyChain, type SignedMandate } from "@/lib/mandate/signing";
 
 export const runtime = "nodejs";
 
@@ -28,11 +28,18 @@ export async function GET() {
   }
 
   // Per-agent signed-mandate verification status.
-  const mandates: Record<string, { verified: boolean; reason: string }> = {};
+  const mandates: Record<string, { verified: boolean; reason: string; issuer: string; depth: number }> = {};
   for (const a of ledger.getAgents()) {
     const sm = ledger.getMandate<SignedMandate>(a.agentId);
-    const v = sm ? verifyMandate(sm, operator.publicKeyPem) : { valid: false, reason: "no signed mandate" };
-    mandates[a.agentId] = { verified: v.valid, reason: v.reason };
+    const v = sm
+      ? verifyChain(sm, (id) => ledger.getMandate<SignedMandate>(id), operator.publicKeyPem, (n) => ledger.isRevoked(n))
+      : { valid: false, reason: "no signed mandate", depth: 0 };
+    mandates[a.agentId] = {
+      verified: v.valid,
+      reason: v.reason,
+      issuer: sm?.doc.issuer ?? "operator",
+      depth: "depth" in v ? v.depth : 0,
+    };
   }
 
   return NextResponse.json({

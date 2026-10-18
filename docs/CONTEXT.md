@@ -14,14 +14,26 @@ and **auto-reconciles** every charge to its agent+task with an immutable audit l
 One-liner: *"Give your AI agents a wallet, not the keys to the vault."*
 
 ## Why this wins (the wedge)
-- Generic autonomous treasury (forecast + FX) is a **crowded** category (Concourse,
-  Atlar, Bottomline) — judges see it as derivative.
-- The open frontier is treasury **for the AI agents themselves** — the hottest 2026
-  fintech theme (agentic commerce: AP2, Visa Intelligent Commerce, x402). Validated
-  pain: Uber burned its entire 2026 AI budget by April; "AI agents need permissioned
-  funding sources, not company bank accounts."
+- Generic autonomous treasury (forecast + FX) is a **crowded** category — the hackathon
+  field confirmed it (many SME treasury controllers + intent-bound purchase agents).
+- Our wedge is **agent-native treasury + the delegation layer**: not a human-CFO tool,
+  but infrastructure for a *fleet* of autonomous agents that spend — and that can
+  **delegate budgets to one another** safely.
+- **Crown differentiator (nobody else has it): Delegated Mandates.** Cryptographically
+  attenuated sub-mandates let one agent hire another; revoke the parent and the whole
+  subtree dies. Solves the #1 *unsolved* 2026 agentic-payments problem (cascading
+  delegation / revocable authority chains).
 - Uniquely enabled by Airwallex: multi-currency wallet + interbank FX + programmatic
-  **Visa** issuing with real-time authorization — few stacks combine all three.
+  **Visa** issuing with real-time authorization.
+
+## Competitive read (from the submissions sanity-check)
+- Crowded clusters: SME treasury controllers (Adhham ≈ our base concept, Hobie, Osman,
+  Umang, Yilrit) and trust layers (xCard/ENS, Kairos/simulated, AgentPay Shield/firewall).
+- We stand apart: **agent-native + fully working (real FX) + delegated mandates + NL
+  policy + real LLM over MCP** — a combination no single competitor has.
+- Shipping to pull further ahead: **delegated mandates (done)**, **real payouts**
+  (undeniable money movement; card issuing is blocked for us *and* several rivals),
+  **prompt-injection demo**.
 
 ## Hackathon facts
 - Host: Airwallex. Track: **Adaptive Treasury Controller** (Treasury & Ops).

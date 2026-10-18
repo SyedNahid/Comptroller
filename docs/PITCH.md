@@ -5,6 +5,16 @@
 
 ---
 
+## 0. Positioning (how we stand apart from the field)
+The hackathon is crowded with **SME treasury controllers** (fund/convert/defer/escalate
+for a human finance team) and **intent-bound purchase agents**. Comptroller is neither
+a human-CFO tool nor a single card wrapper: it is **agent-native treasury + the
+delegation layer** — infrastructure for when you run a *fleet* of autonomous agents
+that spend, and those agents **delegate budgets to each other**. Our unique combination,
+all working (not simulated): real Airwallex FX · signed Ed25519 mandates · **delegated
+sub-mandates (capability attenuation)** · NL→policy authoring · a real LLM agent over
+MCP. No single competitor has this stack.
+
 ## 1. The one-liner
 Comptroller is a treasury that funds a company's fleet of AI agents just-in-time —
 converting to the right currency, issuing single-use scoped cards, approving or
@@ -62,6 +72,16 @@ reconcile to agent+task → audit entry.
 
 ## 5. The awe factor (what makes judges lean in)
 
+0. **The one nobody else has — Delegated Mandates.** Comptroller is the only entry
+   where **one agent can safely *hire* another**: a parent agent mints a
+   cryptographically **attenuated** sub-mandate (cap ≤ parent, merchants ⊆ parent,
+   expiry ≤ parent), signed with its own key, forming a verifiable authority chain to
+   the human operator. **Revoke the parent → the whole subtree dies.** This directly
+   solves the #1 *unsolved* problem in agentic payments for 2026 — *"authority passes
+   down a chain… re-signed and narrowed at every hop; how a principal manages/revokes
+   it remains largely unsolved."* Macaroons attenuate but can't express budgets; we do.
+   Live-demoable: delegate → child spends within sub-budget → over sub-budget denied →
+   illegal delegation blocked at mint → revoke parent → subtree void.
 1. **It's real money, live.** Real Airwallex sandbox auth, balances, and **FX
    conversions** — then we cut to Airwallex's own dashboard showing the exact same
    conversion IDs. Not a mock.

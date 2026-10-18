@@ -78,6 +78,11 @@ CREATE TABLE IF NOT EXISTS mandates (
   created_at   TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS revocations (
+  nonce        TEXT PRIMARY KEY,
+  created_at   TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS audit_log (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
   ts               TEXT NOT NULL,

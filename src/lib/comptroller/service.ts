@@ -15,7 +15,7 @@ import { randomUUID } from "node:crypto";
 import type { AirwallexClient } from "../airwallex/client";
 import { Ledger } from "../ledger/store";
 import { evaluateMandate } from "../mandate/engine";
-import { verifyMandate, type SignedMandate } from "../mandate/signing";
+import { verifyChain, type SignedMandate } from "../mandate/signing";
 import type { FundRequest, MandateDecision } from "../mandate/types";
 import { toMajor, toMinor, formatMoney } from "../money";
 import type { CardIssuer } from "./issuer";
@@ -63,7 +63,12 @@ export class Comptroller {
     if (this.opts.operatorPublicKeyPem) {
       const sm = this.ledger.getMandate<SignedMandate>(req.agentId);
       const v = sm
-        ? verifyMandate(sm, this.opts.operatorPublicKeyPem)
+        ? verifyChain(
+            sm,
+            (id) => this.ledger.getMandate<SignedMandate>(id),
+            this.opts.operatorPublicKeyPem,
+            (nonce) => this.ledger.isRevoked(nonce),
+          )
         : { valid: false, reason: "no signed mandate on file" };
       if (!v.valid) {
         const frId = this.ledger.createFundRequest({

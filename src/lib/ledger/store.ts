@@ -61,6 +61,7 @@ export class Ledger {
       "authorizations",
       "clawbacks",
       "audit_log",
+      "revocations",
     ]) {
       this.db.exec(`DELETE FROM ${t};`);
     }
@@ -329,6 +330,16 @@ export class Ledger {
   countMandates(): number {
     const row = this.db.prepare(`SELECT COUNT(*) AS n FROM mandates`).get() as { n: number };
     return row.n;
+  }
+
+  revokeNonce(nonce: string) {
+    this.db
+      .prepare(`INSERT OR IGNORE INTO revocations (nonce, created_at) VALUES (?, ?)`)
+      .run(nonce, new Date().toISOString());
+  }
+
+  isRevoked(nonce: string): boolean {
+    return !!this.db.prepare(`SELECT 1 FROM revocations WHERE nonce = ?`).get(nonce);
   }
 
   /** Demo: corrupt a stored mandate's signature so verification fails. */
