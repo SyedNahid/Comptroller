@@ -212,6 +212,9 @@ export function getComptroller(): Singletons {
   const comptroller = new Comptroller(ledger, ax, issuer, {
     treasuryReserveCurrency: process.env.COMPTROLLER_RESERVE ?? "USD",
     operatorPublicKeyPem: operator.publicKeyPem,
+    // When the adaptive governor tightens an agent's policy, re-sign its root
+    // mandate with the operator key so the narrowed authority stays verifiable.
+    resealAgent: (agentId: string) => sealAgentMandate(agentId),
   });
 
   g.__comptroller = {

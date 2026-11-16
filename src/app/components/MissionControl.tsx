@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { formatMoney } from "@/lib/money";
-import { DECISION_TONE, AUDIT_META, type State } from "./types";
+import { DECISION_TONE, AUDIT_META, RISK_TONE, type RiskStatus, type State } from "./types";
 import { Card, Pill, useCountUp } from "./ui";
 
 export function MissionControl({
@@ -21,6 +21,7 @@ export function MissionControl({
   const saved = useCountUp((state?.totalSavedMinor ?? 0) / 100);
   const [editing, setEditing] = useState<string | null>(null);
   const [text, setText] = useState("");
+  const frozen = (state?.agents ?? []).filter((a) => state?.risk?.[a.agentId]?.frozen);
 
   return (
     <div className="space-y-6">
@@ -41,6 +42,33 @@ export function MissionControl({
         />
       </div>
 
+      {/* Circuit-breaker banner — the adaptive governor froze an agent */}
+      {frozen.map((a) => {
+        const r = state!.risk[a.agentId];
+        return (
+          <Card key={a.agentId} className="animate-flashred border-rose-300 bg-rose-50/60 p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-rose-600 text-white">🛑</span>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-rose-800">
+                  Circuit breaker tripped — {a.displayName} frozen
+                </div>
+                <div className="text-xs text-rose-700">
+                  Behavioral risk {r.score}/100 ({r.band}). All spend is denied until an operator clears it.
+                </div>
+              </div>
+              <button
+                disabled={busy}
+                onClick={() => run(() => post("/api/agent/clear", { agentId: a.agentId }))}
+                className="ml-auto rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-500 disabled:opacity-50"
+              >
+                Clear breaker
+              </button>
+            </div>
+          </Card>
+        );
+      })}
+
       {/* Treasury balances */}
       <Card className="p-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -54,6 +82,14 @@ export function MissionControl({
             {state?.operatorFingerprint && (
               <span className="nums text-xs text-gray-400">🔑 {state.operatorFingerprint}</span>
             )}
+            <button
+              disabled={busy}
+              onClick={() => run(() => post("/api/demo/attack", { agentId: "ad-buyer" }))}
+              className="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-500 disabled:opacity-50"
+              title="Fire a burst of off-mandate requests to drive the adaptive governor live"
+            >
+              ⚠ Simulate compromised agent
+            </button>
             <a href="/api/export/reconciliation" className="text-xs font-medium text-indigo-600 hover:text-indigo-500">
               Export CSV ↓
             </a>
@@ -97,6 +133,7 @@ export function MissionControl({
                     edit policy
                   </button>
                 </div>
+                <RiskMeter r={state?.risk?.[a.agentId]} />
                 {editing === a.agentId && (
                   <div className="mt-3 space-y-2">
                     <textarea
@@ -188,6 +225,34 @@ export function MissionControl({
       </div>
 
       <p className="text-center text-xs text-gray-400">{funded} funded · deterministic mandate engine · immutable audit</p>
+    </div>
+  );
+}
+
+/** Live behavioral-risk meter for one agent — the Adaptive Loop made visible. */
+function RiskMeter({ r }: { r?: RiskStatus }) {
+  if (!r) return null;
+  const rt = RISK_TONE[r.band] ?? { tone: "gray" as const, dot: "bg-gray-400" };
+  return (
+    <div className="mt-3 border-t border-gray-100 pt-3">
+      <div className="flex items-center gap-2">
+        <Pill tone={rt.tone}>
+          <span className={`h-1.5 w-1.5 rounded-full ${rt.dot}`} /> {r.band} · risk {r.score}
+        </Pill>
+        <span className="ml-auto nums text-xs text-gray-400">trust {r.trust}/100</span>
+      </div>
+      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+        <div className={`h-full rounded-full ${rt.dot} transition-all duration-500`} style={{ width: `${r.score}%` }} />
+      </div>
+      {r.factors.length > 0 && (
+        <ul className="mt-2 space-y-0.5">
+          {r.factors.slice(0, 3).map((f) => (
+            <li key={f.key} className="text-[11px] text-gray-500">
+              • {f.label} <span className="text-gray-400">(+{f.points})</span> — {f.detail}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

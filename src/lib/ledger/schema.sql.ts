@@ -105,4 +105,18 @@ CREATE TABLE IF NOT EXISTS audit_log (
   message          TEXT NOT NULL,
   data_json        TEXT
 );
+
+-- Adaptive Loop: live per-agent behavioral risk + circuit-breaker state.
+CREATE TABLE IF NOT EXISTS agent_risk (
+  agent_id      TEXT PRIMARY KEY,
+  score         INTEGER NOT NULL DEFAULT 0,
+  band          TEXT NOT NULL DEFAULT 'CALM',   -- CALM | ELEVATED | HIGH | CRITICAL
+  action        TEXT NOT NULL DEFAULT 'NONE',   -- NONE | FLAG | TIGHTEN | FREEZE
+  factors_json  TEXT,
+  frozen        INTEGER NOT NULL DEFAULT 0,     -- 1 = circuit breaker tripped
+  trust         INTEGER NOT NULL DEFAULT 50,    -- 0-100 "agent credit score"
+  baseline_json TEXT,                           -- original policy to relax back toward
+  cleared_at    TEXT,                           -- last operator breaker-clear; risk ignores older events
+  updated_at    TEXT
+);
 `;

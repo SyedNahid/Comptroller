@@ -35,10 +35,25 @@ export interface MandateStatus {
   issuer?: string;
   depth?: number;
 }
+export interface RiskFactor {
+  key: string;
+  label: string;
+  points: number;
+  detail: string;
+}
+export interface RiskStatus {
+  score: number;
+  band: string; // CALM | ELEVATED | HIGH | CRITICAL
+  action: string; // NONE | FLAG | TIGHTEN | FREEZE
+  frozen: boolean;
+  trust: number;
+  factors: RiskFactor[];
+}
 export interface State {
   issuingKind: string;
   operatorFingerprint: string;
   mandates: Record<string, MandateStatus>;
+  risk: Record<string, RiskStatus>;
   agents: AgentPolicy[];
   requests: FundRequestRow[];
   audit: AuditRow[];
@@ -87,4 +102,16 @@ export const AUDIT_META: Record<string, { tone: Tone; dot: string }> = {
   DELEGATED: { tone: "violet", dot: "bg-violet-500" },
   MANDATE_REVOKED: { tone: "rose", dot: "bg-rose-500" },
   PAYOUT_SENT: { tone: "teal", dot: "bg-teal-500" },
+  MANDATE_TIGHTENED: { tone: "amber", dot: "bg-amber-500" },
+  CIRCUIT_BREAKER: { tone: "rose", dot: "bg-rose-600" },
+  FROZEN_DENY: { tone: "rose", dot: "bg-rose-500" },
+  OPERATOR_CLEARED: { tone: "emerald", dot: "bg-emerald-500" },
+};
+
+/** Risk band → pill tone + dot color, for the per-agent risk badge. */
+export const RISK_TONE: Record<string, { tone: Tone; dot: string }> = {
+  CALM: { tone: "emerald", dot: "bg-emerald-500" },
+  ELEVATED: { tone: "amber", dot: "bg-amber-500" },
+  HIGH: { tone: "amber", dot: "bg-orange-500" },
+  CRITICAL: { tone: "rose", dot: "bg-rose-600" },
 };

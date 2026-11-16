@@ -12,6 +12,8 @@
     "demo:mandate": "tsx scripts/demo-mandate.ts",
     "demo:e2e": "tsx scripts/demo-e2e.ts",
     "demo:delegation": "tsx scripts/demo-delegation.ts",
+    "demo:adaptive": "tsx scripts/demo-adaptive.ts",
+    "demo:adaptive:live": "tsx scripts/demo-adaptive-live.ts",
     "mcp": "tsx src/mcp/server.ts",
     "mcp:smoke": "tsx scripts/mcp-smoke.ts",
     "agent": "tsx scripts/agent.ts"

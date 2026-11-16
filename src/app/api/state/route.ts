@@ -42,10 +42,27 @@ export async function GET() {
     };
   }
 
+  // Adaptive Loop: live per-agent behavioral risk + circuit-breaker state.
+  const risk: Record<
+    string,
+    { score: number; band: string; action: string; frozen: boolean; trust: number; factors: unknown[] }
+  > = {};
+  for (const r of ledger.getRiskStates()) {
+    risk[r.agent_id] = {
+      score: r.score,
+      band: r.band,
+      action: r.action,
+      frozen: r.frozen === 1,
+      trust: r.trust,
+      factors: r.factors_json ? (JSON.parse(r.factors_json) as unknown[]) : [],
+    };
+  }
+
   return NextResponse.json({
     issuingKind,
     operatorFingerprint,
     mandates,
+    risk,
     agents: ledger.getAgents(),
     requests: ledger.getFundRequests(50),
     conversions: ledger.getConversions(50),

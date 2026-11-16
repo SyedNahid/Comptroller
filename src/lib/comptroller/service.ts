@@ -16,8 +16,10 @@ import type { AirwallexClient } from "../airwallex/client";
 import { Ledger } from "../ledger/store";
 import { evaluateMandate } from "../mandate/engine";
 import { verifyChain, type SignedMandate } from "../mandate/signing";
-import type { FundRequest, MandateDecision } from "../mandate/types";
+import type { AgentPolicy, FundRequest, MandateDecision } from "../mandate/types";
 import { toMajor, toMinor, formatMoney } from "../money";
+import { assessRisk, type RiskEvent } from "../adaptive/risk";
+import { planGovernance, updateTrust, DEFAULT_TRUST } from "../adaptive/governor";
 import type { CardIssuer } from "./issuer";
 
 /** Assumed traditional-bank FX markup, used to estimate savings vs Airwallex. */
@@ -44,7 +46,12 @@ export class Comptroller {
     private ledger: Ledger,
     private ax: AirwallexClient,
     private issuer: CardIssuer,
-    private opts: { treasuryReserveCurrency?: string; operatorPublicKeyPem?: string } = {},
+    private opts: {
+      treasuryReserveCurrency?: string;
+      operatorPublicKeyPem?: string;
+      /** Re-sign an agent's root mandate after the governor tightens its policy. */
+      resealAgent?: (agentId: string) => void;
+    } = {},
   ) {}
 
   private reserve() {
@@ -57,6 +64,12 @@ export class Comptroller {
     if (!policy) {
       throw new Error(`No policy for agent ${req.agentId}`);
     }
+
+    // Circuit breaker: if the adaptive governor has frozen this agent, no money
+    // moves — regardless of how valid the request looks. This is the last line of
+    // defense when an agent is compromised.
+    const frozen = this.frozenGate(req, now);
+    if (frozen) return frozen;
 
     // Verify the agent's cryptographically signed mandate BEFORE anything else.
     // No valid signature (or tampered/expired) → refuse to move money.
@@ -131,6 +144,10 @@ export class Comptroller {
       message: decision.reason,
       data: { checks: decision.checks },
     });
+
+    // Close the adaptive loop: re-score the agent's behavior and let the governor
+    // react (flag / tighten+re-sign / freeze) for subsequent requests.
+    this.assessAndGovern(req.agentId, now, decision.decision);
 
     if (decision.decision !== "AUTO_APPROVE") {
       return {
@@ -280,6 +297,14 @@ export class Comptroller {
     const policy = this.ledger.getPolicy(input.agentId);
     if (!policy) throw new Error(`No policy for agent ${input.agentId}`);
 
+    // Circuit breaker — a frozen agent cannot send a payout either.
+    if (this.ledger.isAgentFrozen(input.agentId)) {
+      return {
+        decision: "DENY",
+        reason: "Circuit breaker tripped — agent frozen pending operator review",
+      };
+    }
+
     // Mandate chain + policy evaluation (identical trust gate as card funding).
     if (this.opts.operatorPublicKeyPem) {
       const sm = this.ledger.getMandate<SignedMandate>(input.agentId);
@@ -307,6 +332,7 @@ export class Comptroller {
       createdAt: now,
     });
     this.ledger.appendAudit({ ts: now, agentId: input.agentId, fundRequestId: frId, type: `MANDATE_${decision.decision}`, message: decision.reason });
+    this.assessAndGovern(input.agentId, now, decision.decision);
     if (decision.decision !== "AUTO_APPROVE") {
       return { decision: decision.decision, reason: decision.reason };
     }
@@ -442,8 +468,143 @@ export class Comptroller {
         type: "CLAWBACK",
         message: `Reconciled spend ${formatMoney(input.spendMinor, fr.currency)}; clawed back ${formatMoney(residual, fr.currency)}; card cancelled`,
       });
+      // A clean, in-scope settlement earns the agent trust (its "credit score").
+      const rs = this.ledger.getRiskState(fr.agent_id);
+      this.ledger.upsertRiskState({
+        agentId: fr.agent_id,
+        score: rs?.score ?? 0,
+        band: rs?.band ?? "CALM",
+        action: rs?.action ?? "NONE",
+        frozen: !!rs?.frozen,
+        trust: updateTrust(rs?.trust ?? DEFAULT_TRUST, "clean_settle"),
+        updatedAt: now,
+      });
     }
 
     return out;
+  }
+
+  // ---- Adaptive Loop ------------------------------------------------------
+
+  /** Record + return a DENY when the agent's circuit breaker is tripped. */
+  private frozenGate(req: FundRequest, now: string): FundResult | null {
+    if (!this.ledger.isAgentFrozen(req.agentId)) return null;
+    const reason = "Circuit breaker tripped — agent frozen pending operator review";
+    const frId = this.ledger.createFundRequest({
+      agentId: req.agentId,
+      task: req.task,
+      amountMinor: req.amountMinor,
+      currency: req.currency,
+      merchantCategory: req.merchantCategory,
+      merchantName: req.merchantName,
+      decision: "DENY",
+      status: "DENIED",
+      reason,
+      createdAt: now,
+    });
+    this.ledger.appendAudit({
+      ts: now,
+      agentId: req.agentId,
+      fundRequestId: frId,
+      type: "FROZEN_DENY",
+      message: `Refused — ${reason}`,
+    });
+    return { fundRequestId: frId, decision: "DENY", reason, status: "DENIED", checks: [] };
+  }
+
+  /**
+   * Re-score the agent from recent ledger history and let the governor react.
+   * TIGHTEN narrows the policy and re-signs the mandate; FREEZE trips the breaker.
+   * Effects apply to subsequent requests — the current one keeps its decision.
+   */
+  private assessAndGovern(agentId: string, now: string, lastDecision: string): void {
+    const policy = this.ledger.getPolicy(agentId);
+    if (!policy) return;
+
+    // After an operator clears the breaker, ignore everything that happened before
+    // the clear — otherwise stale history would instantly re-trip the breaker.
+    const clearedAt = this.ledger.getRiskState(agentId)?.cleared_at ?? null;
+
+    const events: RiskEvent[] = this.ledger
+      .getFundRequests(50)
+      .filter((r) => r.agent_id === agentId && (!clearedAt || r.created_at > clearedAt))
+      .map((r) => ({
+        amountMinor: r.amount_minor,
+        currency: r.currency,
+        merchantCategory: r.merchant_cat,
+        decision: r.decision,
+        createdAt: r.created_at,
+      }));
+
+    const spentToday = this.ledger.getSpentTodayMinor(
+      agentId,
+      policy.allowedCurrencies[0] ?? policy.baseCurrency,
+    );
+    const assessment = assessRisk({
+      now,
+      events,
+      dailyCapMinor: policy.dailyCapMinor,
+      spentTodayMinor: spentToday,
+      autoApproveThresholdMinor: policy.autoApproveThresholdMinor,
+    });
+    const plan = planGovernance(assessment, policy);
+
+    const prev = this.ledger.getRiskState(agentId);
+    // Snapshot the original policy the first time we ever score this agent, so a
+    // later trust-based relax has a ceiling to climb back toward.
+    const baseline: AgentPolicy | undefined = prev?.baseline_json ? undefined : policy;
+
+    const outcome = plan.freeze
+      ? "frozen"
+      : plan.tightenedPolicy
+        ? "tightened"
+        : lastDecision === "DENY"
+          ? "denied"
+          : "approved";
+    const trust = updateTrust(prev?.trust ?? DEFAULT_TRUST, outcome);
+
+    if (plan.tightenedPolicy) {
+      this.ledger.upsertAgent(plan.tightenedPolicy);
+      this.opts.resealAgent?.(agentId);
+      this.ledger.appendAudit({ ts: now, agentId, type: "MANDATE_TIGHTENED", message: plan.note });
+    }
+    if (plan.freeze && !prev?.frozen) {
+      this.ledger.appendAudit({ ts: now, agentId, type: "CIRCUIT_BREAKER", message: plan.note });
+    }
+
+    this.ledger.upsertRiskState({
+      agentId,
+      score: assessment.score,
+      band: assessment.band,
+      action: plan.action,
+      factors: assessment.factors,
+      frozen: plan.freeze || !!prev?.frozen, // freeze is sticky until operator clears
+      trust,
+      baseline,
+      updatedAt: now,
+    });
+  }
+
+  /** Operator action: clear a tripped circuit breaker and resume the agent. */
+  clearFreeze(agentId: string, now = new Date().toISOString()): void {
+    this.ledger.setAgentFrozen(agentId, false, now);
+    const prev = this.ledger.getRiskState(agentId);
+    this.ledger.upsertRiskState({
+      agentId,
+      score: 0,
+      band: "CALM",
+      action: "NONE",
+      factors: [],
+      frozen: false,
+      trust: prev?.trust ?? DEFAULT_TRUST,
+      clearedAt: now, // risk re-scoring ignores events at/before this moment
+      updatedAt: now,
+    });
+    this.ledger.appendAudit({
+      ts: now,
+      agentId,
+      type: "OPERATOR_CLEARED",
+      message: `Operator cleared the circuit breaker for ${agentId}; agent resumes under its (tightened) mandate`,
+    });
   }
 }

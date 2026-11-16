@@ -34,6 +34,19 @@ export interface AuditRow {
   data_json: string | null;
 }
 
+export interface RiskStateRow {
+  agent_id: string;
+  score: number;
+  band: string;
+  action: string;
+  factors_json: string | null;
+  frozen: number;
+  trust: number;
+  baseline_json: string | null;
+  cleared_at: string | null;
+  updated_at: string | null;
+}
+
 /** ISO date (YYYY-MM-DD) for daily-cap aggregation. Injectable for tests. */
 export function today(now = new Date()): string {
   return now.toISOString().slice(0, 10);
@@ -63,6 +76,7 @@ export class Ledger {
       "transfers",
       "audit_log",
       "revocations",
+      "agent_risk",
     ]) {
       this.db.exec(`DELETE FROM ${t};`);
     }
@@ -421,5 +435,79 @@ export class Ledger {
     return this.db
       .prepare(`SELECT * FROM audit_log ORDER BY id DESC LIMIT ?`)
       .all(limit) as unknown as AuditRow[];
+  }
+
+  // ---- Adaptive Loop: risk + circuit-breaker state ------------------------
+
+  getRiskState(agentId: string): RiskStateRow | undefined {
+    return this.db
+      .prepare(`SELECT * FROM agent_risk WHERE agent_id = ?`)
+      .get(agentId) as unknown as RiskStateRow | undefined;
+  }
+
+  getRiskStates(): RiskStateRow[] {
+    return this.db
+      .prepare(`SELECT * FROM agent_risk`)
+      .all() as unknown as RiskStateRow[];
+  }
+
+  /** Persist the latest risk assessment + governance state for an agent. */
+  upsertRiskState(s: {
+    agentId: string;
+    score: number;
+    band: string;
+    action: string;
+    factors?: unknown;
+    frozen: boolean;
+    trust: number;
+    baseline?: unknown;
+    clearedAt?: string;
+    updatedAt: string;
+  }) {
+    this.db
+      .prepare(
+        `INSERT INTO agent_risk
+           (agent_id, score, band, action, factors_json, frozen, trust, baseline_json, cleared_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(agent_id) DO UPDATE SET
+           score = excluded.score,
+           band = excluded.band,
+           action = excluded.action,
+           factors_json = excluded.factors_json,
+           frozen = excluded.frozen,
+           trust = excluded.trust,
+           -- keep the first-seen baseline / last clear unless explicitly provided
+           baseline_json = COALESCE(excluded.baseline_json, agent_risk.baseline_json),
+           cleared_at = COALESCE(excluded.cleared_at, agent_risk.cleared_at),
+           updated_at = excluded.updated_at`,
+      )
+      .run(
+        s.agentId,
+        s.score,
+        s.band,
+        s.action,
+        s.factors !== undefined ? JSON.stringify(s.factors) : null,
+        s.frozen ? 1 : 0,
+        s.trust,
+        s.baseline !== undefined ? JSON.stringify(s.baseline) : null,
+        s.clearedAt ?? null,
+        s.updatedAt,
+      );
+  }
+
+  setAgentFrozen(agentId: string, frozen: boolean, at: string) {
+    this.db
+      .prepare(
+        `INSERT INTO agent_risk (agent_id, frozen, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(agent_id) DO UPDATE SET frozen = excluded.frozen, updated_at = excluded.updated_at`,
+      )
+      .run(agentId, frozen ? 1 : 0, at);
+  }
+
+  isAgentFrozen(agentId: string): boolean {
+    const row = this.db
+      .prepare(`SELECT frozen FROM agent_risk WHERE agent_id = ?`)
+      .get(agentId) as { frozen: number } | undefined;
+    return !!row && row.frozen === 1;
   }
 }
