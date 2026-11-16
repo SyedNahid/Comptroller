@@ -65,7 +65,8 @@ export class Ledger {
     this.db.close();
   }
 
-  /** Clear all activity (keeps seeded agents). For demo replays. */
+  /** Clear all activity AND the fleet (agents + mandates, so delegated
+   *  children don't survive). The caller re-seeds and re-signs roots. */
   reset() {
     for (const t of [
       "fund_requests",
@@ -77,6 +78,8 @@ export class Ledger {
       "audit_log",
       "revocations",
       "agent_risk",
+      "mandates",
+      "agents",
     ]) {
       this.db.exec(`DELETE FROM ${t};`);
     }
