@@ -1,0 +1,34 @@
+# Render Blueprint for the Comptroller demo.
+#
+# Free tier notes:
+#  - The instance spins down after ~15 min idle (first request after that takes ~1 min).
+#  - The disk is EPHEMERAL: .data/ (SQLite ledger + operator keys) resets on every
+#    deploy/restart. Fine for the demo — state reseeds and /api/reset exists.
+services:
+  - type: web
+    name: comptroller
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /
+    envVars:
+      # node:sqlite needs a modern Node; match local dev.
+      - key: NODE_VERSION
+        value: 25.5.0
+      - key: AIRWALLEX_CLIENT_ID
+        sync: false
+      - key: AIRWALLEX_API_KEY
+        sync: false
+      - key: AIRWALLEX_BASE_URL
+        value: https://api.sandbox.airwallex.com
+      - key: AIRWALLEX_CARDHOLDER_ID
+        sync: false
+      - key: AIRWALLEX_REMOTE_AUTH_SECRET
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_BASE_URL
+        sync: false
+      - key: LLM_MODEL
+        sync: false
