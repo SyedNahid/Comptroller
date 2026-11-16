@@ -134,7 +134,7 @@ async function main() {
       // the issuing program for the sandbox account. See docs/FIXES.md.
       type: "GOOD_FUNDS_CREDIT",
       is_personalized: false,
-      purpose: "ONLINE_PURCHASING",
+      // `purpose` is only valid for ORGANISATION cards; omit it for INDIVIDUAL.
       authorization_controls: {
         allowed_currencies: ["USD"],
         allowed_transaction_count: "SINGLE",

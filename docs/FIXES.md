@@ -65,6 +65,14 @@ A running log of problems hit and how they were solved, so we don't re-debug the
 ### FX conversion `reason` enum
 - `reason: "other"` is accepted by conversions/create. (Full enum not needed yet.)
 
+### Payouts / transfers (PASS — real money movement)
+- Beneficiary schema param is **`payment_method`** (not `transfer_method`).
+- Transfer create **must NOT send `x-api-version`** — with it, 400 "field [currency] is
+  required"; without it, the `transfer_amount`/`transfer_currency`/`source_currency` body works.
+- Needs **Transfers + Beneficiaries** key scopes (401 otherwise).
+- Returns SCHEDULED + fee; `simulation/transfers/{id}/transition` needs a Simulation scope (optional).
+- Verified: real transfer through the mandate gate; off-mandate denied (no transfer).
+
 ## Open items (post-enablement)
 - [ ] Re-run card issuance once issuing program configured; confirm card object + PAN.
 - [ ] Simulate-transaction endpoint path + payload (sandbox) → trigger a decline.

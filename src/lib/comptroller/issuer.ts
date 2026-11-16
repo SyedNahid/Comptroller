@@ -79,7 +79,8 @@ export class AirwallexCardIssuer implements CardIssuer {
       issue_to: "INDIVIDUAL",
       type: "GOOD_FUNDS_CREDIT",
       is_personalized: false,
-      purpose: "ONLINE_PURCHASING",
+      // `purpose` is only valid for ORGANISATION cards; omit for INDIVIDUAL
+      // (Airwallex rejects it otherwise: "Purpose can only be set when ...").
       authorization_controls: {
         allowed_currencies: [input.currency],
         allowed_transaction_count: input.singleUse ? "SINGLE" : "MULTIPLE",

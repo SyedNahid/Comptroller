@@ -64,12 +64,36 @@ CREATE TABLE IF NOT EXISTS authorizations (
   created_at       TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS transfers (
+  id               TEXT PRIMARY KEY,
+  fund_request_id  TEXT,
+  transfer_id      TEXT,              -- Airwallex transfer id
+  short_ref        TEXT,
+  beneficiary      TEXT,
+  amount_minor     INTEGER,
+  currency         TEXT,
+  fee_minor        INTEGER,
+  status           TEXT,
+  created_at       TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS clawbacks (
   id               TEXT PRIMARY KEY,
   fund_request_id  TEXT,
   card_id          TEXT,
   residual_minor   INTEGER,
   created_at       TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS mandates (
+  agent_id     TEXT PRIMARY KEY,
+  signed_json  TEXT NOT NULL,
+  created_at   TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS revocations (
+  nonce        TEXT PRIMARY KEY,
+  created_at   TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS audit_log (
@@ -80,5 +104,19 @@ CREATE TABLE IF NOT EXISTS audit_log (
   type             TEXT NOT NULL,
   message          TEXT NOT NULL,
   data_json        TEXT
+);
+
+-- Adaptive Loop: live per-agent behavioral risk + circuit-breaker state.
+CREATE TABLE IF NOT EXISTS agent_risk (
+  agent_id      TEXT PRIMARY KEY,
+  score         INTEGER NOT NULL DEFAULT 0,
+  band          TEXT NOT NULL DEFAULT 'CALM',   -- CALM | ELEVATED | HIGH | CRITICAL
+  action        TEXT NOT NULL DEFAULT 'NONE',   -- NONE | FLAG | TIGHTEN | FREEZE
+  factors_json  TEXT,
+  frozen        INTEGER NOT NULL DEFAULT 0,     -- 1 = circuit breaker tripped
+  trust         INTEGER NOT NULL DEFAULT 50,    -- 0-100 "agent credit score"
+  baseline_json TEXT,                           -- original policy to relax back toward
+  cleared_at    TEXT,                           -- last operator breaker-clear; risk ignores older events
+  updated_at    TEXT
 );
 `;

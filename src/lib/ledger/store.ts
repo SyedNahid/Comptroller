@@ -34,6 +34,19 @@ export interface AuditRow {
   data_json: string | null;
 }
 
+export interface RiskStateRow {
+  agent_id: string;
+  score: number;
+  band: string;
+  action: string;
+  factors_json: string | null;
+  frozen: number;
+  trust: number;
+  baseline_json: string | null;
+  cleared_at: string | null;
+  updated_at: string | null;
+}
+
 /** ISO date (YYYY-MM-DD) for daily-cap aggregation. Injectable for tests. */
 export function today(now = new Date()): string {
   return now.toISOString().slice(0, 10);
@@ -60,7 +73,10 @@ export class Ledger {
       "cards",
       "authorizations",
       "clawbacks",
+      "transfers",
       "audit_log",
+      "revocations",
+      "agent_risk",
     ]) {
       this.db.exec(`DELETE FROM ${t};`);
     }
@@ -276,6 +292,43 @@ export class Ledger {
       .run(randomUUID(), c.fundRequestId, c.cardId, c.residualMinor, c.createdAt);
   }
 
+  recordTransfer(t: {
+    fundRequestId: string;
+    transferId?: string;
+    shortRef?: string;
+    beneficiary: string;
+    amountMinor: number;
+    currency: string;
+    feeMinor: number;
+    status: string;
+    createdAt: string;
+  }) {
+    this.db
+      .prepare(
+        `INSERT INTO transfers
+          (id, fund_request_id, transfer_id, short_ref, beneficiary, amount_minor, currency, fee_minor, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        randomUUID(),
+        t.fundRequestId,
+        t.transferId ?? null,
+        t.shortRef ?? null,
+        t.beneficiary,
+        t.amountMinor,
+        t.currency,
+        t.feeMinor,
+        t.status,
+        t.createdAt,
+      );
+  }
+
+  getTransfers(limit = 100) {
+    return this.db
+      .prepare(`SELECT * FROM transfers ORDER BY created_at DESC LIMIT ?`)
+      .all(limit) as unknown as Record<string, unknown>[];
+  }
+
   getConversions(limit = 100) {
     return this.db
       .prepare(`SELECT * FROM conversions ORDER BY created_at DESC LIMIT ?`)
@@ -286,6 +339,12 @@ export class Ledger {
     return this.db
       .prepare(`SELECT * FROM cards ORDER BY created_at DESC LIMIT ?`)
       .all(limit) as unknown as Record<string, unknown>[];
+  }
+
+  getCardByCardId(cardId: string) {
+    return this.db.prepare(`SELECT * FROM cards WHERE card_id = ?`).get(cardId) as
+      | { card_id: string; fund_request_id: string; limit_minor: number; merchant_cat: string | null; currency: string }
+      | undefined;
   }
 
   getAuthorizations(limit = 100) {
@@ -299,6 +358,52 @@ export class Ledger {
       .prepare(`SELECT COALESCE(SUM(saved_minor), 0) AS total FROM conversions`)
       .get() as { total: number };
     return row.total;
+  }
+
+  // ---- Signed mandates ----------------------------------------------------
+
+  upsertMandate(agentId: string, signed: unknown, createdAt: string) {
+    this.db
+      .prepare(
+        `INSERT INTO mandates (agent_id, signed_json, created_at) VALUES (?, ?, ?)
+         ON CONFLICT(agent_id) DO UPDATE SET signed_json = excluded.signed_json,
+           created_at = excluded.created_at`,
+      )
+      .run(agentId, JSON.stringify(signed), createdAt);
+  }
+
+  getMandate<T = unknown>(agentId: string): T | undefined {
+    const row = this.db
+      .prepare(`SELECT signed_json FROM mandates WHERE agent_id = ?`)
+      .get(agentId) as { signed_json: string } | undefined;
+    return row ? (JSON.parse(row.signed_json) as T) : undefined;
+  }
+
+  countMandates(): number {
+    const row = this.db.prepare(`SELECT COUNT(*) AS n FROM mandates`).get() as { n: number };
+    return row.n;
+  }
+
+  revokeNonce(nonce: string) {
+    this.db
+      .prepare(`INSERT OR IGNORE INTO revocations (nonce, created_at) VALUES (?, ?)`)
+      .run(nonce, new Date().toISOString());
+  }
+
+  isRevoked(nonce: string): boolean {
+    return !!this.db.prepare(`SELECT 1 FROM revocations WHERE nonce = ?`).get(nonce);
+  }
+
+  /** Demo: corrupt a stored mandate's signature so verification fails. */
+  tamperMandate(agentId: string) {
+    const row = this.db
+      .prepare(`SELECT signed_json FROM mandates WHERE agent_id = ?`)
+      .get(agentId) as { signed_json: string } | undefined;
+    if (!row) return;
+    const sm = JSON.parse(row.signed_json) as { doc: { constraints: { perTaskCapMinor: number } } };
+    // Raise the cap WITHOUT re-signing — signature no longer matches the doc.
+    sm.doc.constraints.perTaskCapMinor += 10_000_00;
+    this.db.prepare(`UPDATE mandates SET signed_json = ? WHERE agent_id = ?`).run(JSON.stringify(sm), agentId);
   }
 
   // ---- Audit --------------------------------------------------------------
@@ -330,5 +435,79 @@ export class Ledger {
     return this.db
       .prepare(`SELECT * FROM audit_log ORDER BY id DESC LIMIT ?`)
       .all(limit) as unknown as AuditRow[];
+  }
+
+  // ---- Adaptive Loop: risk + circuit-breaker state ------------------------
+
+  getRiskState(agentId: string): RiskStateRow | undefined {
+    return this.db
+      .prepare(`SELECT * FROM agent_risk WHERE agent_id = ?`)
+      .get(agentId) as unknown as RiskStateRow | undefined;
+  }
+
+  getRiskStates(): RiskStateRow[] {
+    return this.db
+      .prepare(`SELECT * FROM agent_risk`)
+      .all() as unknown as RiskStateRow[];
+  }
+
+  /** Persist the latest risk assessment + governance state for an agent. */
+  upsertRiskState(s: {
+    agentId: string;
+    score: number;
+    band: string;
+    action: string;
+    factors?: unknown;
+    frozen: boolean;
+    trust: number;
+    baseline?: unknown;
+    clearedAt?: string;
+    updatedAt: string;
+  }) {
+    this.db
+      .prepare(
+        `INSERT INTO agent_risk
+           (agent_id, score, band, action, factors_json, frozen, trust, baseline_json, cleared_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(agent_id) DO UPDATE SET
+           score = excluded.score,
+           band = excluded.band,
+           action = excluded.action,
+           factors_json = excluded.factors_json,
+           frozen = excluded.frozen,
+           trust = excluded.trust,
+           -- keep the first-seen baseline / last clear unless explicitly provided
+           baseline_json = COALESCE(excluded.baseline_json, agent_risk.baseline_json),
+           cleared_at = COALESCE(excluded.cleared_at, agent_risk.cleared_at),
+           updated_at = excluded.updated_at`,
+      )
+      .run(
+        s.agentId,
+        s.score,
+        s.band,
+        s.action,
+        s.factors !== undefined ? JSON.stringify(s.factors) : null,
+        s.frozen ? 1 : 0,
+        s.trust,
+        s.baseline !== undefined ? JSON.stringify(s.baseline) : null,
+        s.clearedAt ?? null,
+        s.updatedAt,
+      );
+  }
+
+  setAgentFrozen(agentId: string, frozen: boolean, at: string) {
+    this.db
+      .prepare(
+        `INSERT INTO agent_risk (agent_id, frozen, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(agent_id) DO UPDATE SET frozen = excluded.frozen, updated_at = excluded.updated_at`,
+      )
+      .run(agentId, frozen ? 1 : 0, at);
+  }
+
+  isAgentFrozen(agentId: string): boolean {
+    const row = this.db
+      .prepare(`SELECT frozen FROM agent_risk WHERE agent_id = ?`)
+      .get(agentId) as { frozen: number } | undefined;
+    return !!row && row.frozen === 1;
   }
 }

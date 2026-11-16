@@ -188,6 +188,35 @@ export class AirwallexClient {
     });
   }
 
+  // ---- Payouts: beneficiaries + transfers --------------------------------
+
+  /** Dynamic schema: what fields a beneficiary needs for this scenario. */
+  generateBeneficiarySchema(body: {
+    account_currency: string;
+    bank_country_code: string;
+    entity_type: string; // COMPANY | PERSONAL
+    payment_method: string; // LOCAL | SWIFT
+    local_clearing_system?: string;
+  }) {
+    return this.request("POST", "/api/v1/beneficiary_api_schemas/generate", {
+      body,
+      apiVersion: FX_API_VERSION,
+    });
+  }
+
+  /** Create a transfer (payout) with an inline beneficiary. */
+  createTransfer(body: unknown) {
+    return this.request("POST", "/api/v1/transfers/create", { body });
+  }
+
+  /** Sandbox: push a transfer to a terminal state. */
+  transitionTransfer(transferId: string, status: string) {
+    return this.request("POST", `/api/v1/simulation/transfers/${transferId}/transition`, {
+      body: { status },
+      apiVersion: FX_API_VERSION,
+    });
+  }
+
   // ---- Issuing: cardholders + cards --------------------------------------
   // NOTE: exact issuing paths/fields are confirmed during the Week-0 spike;
   // adjust here once the sandbox responses are observed.

@@ -38,9 +38,9 @@ npm run demo:e2e      # full loop against live sandbox FX
 ```
 
 ## Architecture
-See [`docs/`](./docs): `CONTEXT.md` (the why), `ARCHITECTURE.md` (components +
-endpoints), `STATUS.md` (progress), `FIXES.md` (gotchas), `SUPPORT_REQUEST.md`
-(Airwallex enablement).
+See [`docs/`](./docs): `PITCH.md` (pitch + demo script + awe factor), `CONTEXT.md`
+(the why), `ARCHITECTURE.md` (components + endpoints), `STATUS.md` (progress),
+`FIXES.md` (gotchas), `SUPPORT_REQUEST.md` (Airwallex enablement).
 
 Key modules:
 - `src/lib/airwallex/` — typed Airwallex client (auth cache, FX, issuing)

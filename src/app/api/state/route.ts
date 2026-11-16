@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getComptroller } from "@/lib/comptroller/instance";
 import { airwallexFromEnv } from "@/lib/airwallex/client";
+import { verifyChain, type SignedMandate } from "@/lib/mandate/signing";
 
 export const runtime = "nodejs";
 
@@ -12,7 +13,7 @@ interface Balance {
 let balCache: { ts: number; data: Balance[] } | null = null;
 
 export async function GET() {
-  const { ledger, issuingKind } = getComptroller();
+  const { ledger, issuingKind, operator, operatorFingerprint } = getComptroller();
 
   let balances: Balance[] = balCache?.data ?? [];
   if (!balCache || Date.now() - balCache.ts > 15_000) {
@@ -26,12 +27,47 @@ export async function GET() {
     }
   }
 
+  // Per-agent signed-mandate verification status.
+  const mandates: Record<string, { verified: boolean; reason: string; issuer: string; depth: number }> = {};
+  for (const a of ledger.getAgents()) {
+    const sm = ledger.getMandate<SignedMandate>(a.agentId);
+    const v = sm
+      ? verifyChain(sm, (id) => ledger.getMandate<SignedMandate>(id), operator.publicKeyPem, (n) => ledger.isRevoked(n))
+      : { valid: false, reason: "no signed mandate", depth: 0 };
+    mandates[a.agentId] = {
+      verified: v.valid,
+      reason: v.reason,
+      issuer: sm?.doc.issuer ?? "operator",
+      depth: "depth" in v ? v.depth : 0,
+    };
+  }
+
+  // Adaptive Loop: live per-agent behavioral risk + circuit-breaker state.
+  const risk: Record<
+    string,
+    { score: number; band: string; action: string; frozen: boolean; trust: number; factors: unknown[] }
+  > = {};
+  for (const r of ledger.getRiskStates()) {
+    risk[r.agent_id] = {
+      score: r.score,
+      band: r.band,
+      action: r.action,
+      frozen: r.frozen === 1,
+      trust: r.trust,
+      factors: r.factors_json ? (JSON.parse(r.factors_json) as unknown[]) : [],
+    };
+  }
+
   return NextResponse.json({
     issuingKind,
+    operatorFingerprint,
+    mandates,
+    risk,
     agents: ledger.getAgents(),
     requests: ledger.getFundRequests(50),
     conversions: ledger.getConversions(50),
     cards: ledger.getCards(50),
+    transfers: ledger.getTransfers(50),
     authorizations: ledger.getAuthorizations(50),
     audit: ledger.getAuditLog(60),
     totalSavedMinor: ledger.totalSavedMinor(),

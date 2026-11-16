@@ -32,7 +32,22 @@ an Airwallex account-config step (not a code issue).
 - ✅ **External Claude agent** (`scripts/agent.ts`) — connects over MCP, reasons, and
   spends through the governed wallet. `npm run agent` (scripted fallback without
   ANTHROPIC_API_KEY; real Claude tool-loop when a key is present).
-- ✅ Pushed to GitHub: https://github.com/SyedNahid/Comptroller
+- ✅ **Multi-screen demo app** — Problem / Agent Console (live SSE stream of real
+  Groq agent) / Mission Control / Airwallex Proof, with top-nav.
+- ✅ **Signed mandates (Ed25519)** — operator-signed, tamper-evident agent authority
+  verified before any spend (AP2 / Visa Trusted-Agent aligned). Tamper → DENY;
+  re-sign → restored. Verified live. `src/lib/mandate/signing.ts`.
+- ✅ **NL → policy compiler** — operator describes a budget in plain English; an LLM
+  compiles it to a deterministic AgentPolicy, which is applied + operator re-signs the
+  mandate. Verified: new caps enforce, mandate stays valid. `src/lib/agent/policy-compiler.ts`.
+- ✅ **Remote-auth webhook** (`/api/airwallex/remote-auth`) — HMAC-verified real-time
+  approve/decline enforcing card scope; dormant until issuing enabled, correct contract.
+- ✅ **Reconciliation CSV export** (`/api/export/reconciliation`) + dashboard button.
+- ✅ **Delegated mandates** — cryptographic capability attenuation (crown feature).
+- ✅ **Real payouts** — governed Airwallex transfers (real money movement, works today);
+  off-mandate denied. `payBeneficiary` + /api/payout + Proof view.
+- ✅ **UI redesign** (clean fintech SaaS) + delegation tree + prompt-injection demo.
+- ✅ Pushed to GitHub: https://github.com/SyedNahid/Comptroller (latest commits local-only)
 - ✅ Typecheck clean. Next 16 `cacheComponents` disabled (see FIXES).
 - ✅ Docs: CONTEXT / ARCHITECTURE / STATUS / FIXES / SUPPORT_REQUEST.
 
