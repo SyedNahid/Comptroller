@@ -20,17 +20,28 @@ const NAV: { key: View; label: string }[] = [
 ];
 
 async function post(url: string, body?: unknown) {
-  await fetch(url, {
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (!res.ok) {
+    let msg = `Request failed (${res.status})`;
+    try {
+      const j = await res.json();
+      if (j?.error) msg = j.error;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new Error(msg);
+  }
 }
 
 export default function App() {
   const [view, setView] = useState<View>("problem");
   const [state, setState] = useState<State | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -49,9 +60,12 @@ export default function App() {
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
+    setError(null);
     try {
       await fn();
       await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -118,6 +132,22 @@ export default function App() {
           </nav>
         </div>
       </header>
+
+      {error && (
+        <div className="mx-auto mt-4 max-w-6xl px-4 sm:px-6">
+          <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            <span className="font-semibold">⛔ Refused:</span>
+            <span className="min-w-0 flex-1">{error}</span>
+            <button
+              onClick={() => setError(null)}
+              className="text-rose-400 transition hover:text-rose-600"
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         {view === "problem" && <ProblemView onStart={() => setView("agent")} />}
